@@ -16,6 +16,13 @@ from utils.certificate_generator import CertificateGenerator
 from utils.csv_parser import CSVParser
 from utils.email_sender import EmailSender
 from utils.font_config import FontConfiguration
+from utils.font_downloader import (
+    POPULAR_FONTS,
+    download_font,
+    get_available_fonts,
+    is_font_downloaded,
+    resolve_font_path,
+)
 from utils.models import (
     AttendeeRecord,
     CertificateOutput,
@@ -136,9 +143,10 @@ def init_session_state() -> None:
     defaults = {
         "template_file": None, "template_format": None, "template_bytes": None,
         "csv_file": None, "attendees": [], "csv_errors": [],
-        "font_size": 40, "font_color": "#FFFFFF", "vertical_position": 50,
+        "font_size": 40, "font_color": "#FFFFFF", "font_path": "assets/fonts/Arial.ttf",
+        "selected_font": "Arial (Default)", "vertical_position": 50,
         "email_subject": "Your Certificate of Achievement",
-        "email_body": "Hi {name},\n\nCongratulations! Please find your certificate attached.\n\nBest regards,\nAWSC Global",
+        "email_body": "Congratulations! Please find your certificate attached.\n\nBest regards,\nAWSC Global",
         "send_in_progress": False, "show_confirm": False,
         "send_results": None, "generated_certs": [], "zip_bytes": None,
     }
@@ -225,15 +233,49 @@ def render_step_upload_csv() -> None:
             st.session_state["csv_file"] = uploaded
             st.session_state["generated_certs"] = []
             st.session_state["zip_bytes"] = None
-            c1, c2 = st.columns(2)
+
+            # --- Deep Validation Report ---
+            # Count unique rejected rows (a row can have multiple errors)
+            rejected_rows = len({err.row_number for err in result.errors})
+            total_rows = len(result.records) + rejected_rows
+            c1, c2, c3 = st.columns(3)
             with c1:
-                st.markdown(f'<div class="kpi"><div class="kpi-val" style="color:#10B981">{len(result.records)}</div><div class="kpi-lbl">Valid Attendees</div></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="kpi"><div class="kpi-val" style="color:#818CF8">{total_rows}</div><div class="kpi-lbl">Total Rows</div></div>', unsafe_allow_html=True)
             with c2:
-                st.markdown(f'<div class="kpi"><div class="kpi-val" style="color:#F59E0B">{len(result.errors)}</div><div class="kpi-lbl">Issues</div></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="kpi"><div class="kpi-val" style="color:#10B981">{len(result.records)}</div><div class="kpi-lbl">Valid Attendees</div></div>', unsafe_allow_html=True)
+            with c3:
+                st.markdown(f'<div class="kpi"><div class="kpi-val" style="color:#EF4444">{rejected_rows}</div><div class="kpi-lbl">Rejected</div></div>', unsafe_allow_html=True)
+
+            # Alert if any attendees were rejected
             if result.errors:
-                with st.expander("View issues"):
+                st.markdown(
+                    f'<div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); '
+                    f'border-radius:8px; padding:12px 16px; margin:8px 0;">'
+                    f'{svg("x-circle")} <strong style="color:#EF4444;">'
+                    f'{rejected_rows} participant(s) rejected</strong> '
+                    f'— check details below to ensure nobody is missed'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+                with st.expander("⚠️ View rejected participants (IMPORTANT)", expanded=True):
                     for err in result.errors:
-                        st.text(f"Row {err.row_number} [{err.field}]: {err.message}")
+                        st.markdown(
+                            f"- **Row {err.row_number}** [{err.field}]: {err.message}",
+                        )
+                    st.caption(
+                        "Fix these in your file and re-upload to include all participants."
+                    )
+            else:
+                st.markdown(
+                    f'<div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); '
+                    f'border-radius:8px; padding:12px 16px; margin:8px 0;">'
+                    f'{svg("check")} <strong style="color:#10B981;">'
+                    f'All {len(result.records)} participants validated successfully</strong> '
+                    f'— no issues found'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
             if result.records:
                 st.markdown(bdg(f"{svg('check')} Attendees loaded", "ok"), unsafe_allow_html=True)
                 with st.expander("Preview list"):
@@ -258,40 +300,321 @@ def render_step_customize() -> None:
         st.session_state["font_color"] = fc
         vp = st.slider("Name Position (%)", 0, 100, st.session_state["vertical_position"], key="vp2")
         st.session_state["vertical_position"] = vp
+
+        # Font selection from Google Fonts
+        st.markdown("**Font**")
+        available = get_available_fonts()
+        current_font = st.session_state.get("selected_font", "Arial (Default)")
+        if current_font not in available:
+            current_font = "Arial (Default)"
+        idx = available.index(current_font) if current_font in available else 0
+        selected = st.selectbox(
+            "Choose a font",
+            options=available,
+            index=idx,
+            key="font_selector",
+        )
+        font_path = resolve_font_path(selected)
+        if font_path:
+            st.session_state["font_path"] = font_path
+            st.session_state["selected_font"] = selected
+            st.markdown(bdg(f"{svg('check')} {selected}", "ok"), unsafe_allow_html=True)
+
+        # Font preview with sample name
+        preview_font_family = selected.replace(" (Default)", "")
+        st.markdown(
+            f'<link href="https://fonts.googleapis.com/css2?family='
+            f'{preview_font_family.replace(" ", "+")}&display=swap" rel="stylesheet">'
+            f'<div style="background:#1e293b; border:1px solid rgba(255,255,255,0.1); '
+            f'border-radius:8px; padding:16px; margin:8px 0; text-align:center;">'
+            f'<span style="font-family:\'{preview_font_family}\', serif; '
+            f'font-size:{min(fs, 32)}px; color:{fc};">Juan Dela Cruz</span>'
+            f'<div style="color:#64748b; font-size:0.7rem; margin-top:6px;">Font Preview</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Download new fonts section
+        with st.expander("Download more fonts"):
+            st.caption("Browse Google Fonts — select and download to unlock them.")
+            not_downloaded = [f for f in POPULAR_FONTS if not is_font_downloaded(f)]
+            if not not_downloaded:
+                st.markdown(bdg(f"{svg('check')} All fonts downloaded", "ok"), unsafe_allow_html=True)
+            else:
+                font_to_dl = st.selectbox(
+                    "Select font to download",
+                    options=not_downloaded,
+                    key="font_dl_select",
+                )
+                if st.button("Download Font", key="dl_font_btn"):
+                    with st.spinner(f"Downloading {font_to_dl}..."):
+                        success, msg = download_font(font_to_dl)
+                    if success:
+                        st.markdown(
+                            bdg(f"{svg('check')} {msg}", "ok"),
+                            unsafe_allow_html=True,
+                        )
+                        st.rerun()
+                    else:
+                        st.markdown(
+                            bdg(f"{svg('x-circle')} {msg}", "err"),
+                            unsafe_allow_html=True,
+                        )
+
     with c2:
         st.markdown("**Email Content**")
         subj = st.text_input("Subject", st.session_state["email_subject"], key="es2")
         st.session_state["email_subject"] = subj
-        body = st.text_area("Body", st.session_state["email_body"], height=130, key="eb2")
+        st.markdown(
+            '<div style="background:#1e293b; border:1px solid rgba(255,255,255,0.1); '
+            'border-radius:8px 8px 0 0; padding:10px 14px; margin-top:8px; '
+            'font-family:monospace; font-size:0.9rem; color:#94a3b8;">'
+            'Hi {name},</div>',
+            unsafe_allow_html=True,
+        )
+        body = st.text_area(
+            "Body (after greeting)",
+            st.session_state["email_body"],
+            height=100,
+            key="eb2",
+            label_visibility="collapsed",
+        )
         st.session_state["email_body"] = body
-        st.markdown(bdg(f"{svg('zap')} Use {{name}} as placeholder", "info"), unsafe_allow_html=True)
+        st.markdown(bdg(f"{svg('zap')} Greeting 'Hi {{name}},' is auto-added", "info"), unsafe_allow_html=True)
 
 
 def render_step_preview() -> None:
-    step_hdr(4, "Preview Certificate", "eye")
+    step_hdr(4, "Preview & Edit Certificates", "eye")
     tb = st.session_state["template_bytes"]
     att: List[AttendeeRecord] = st.session_state["attendees"]
     if not tb or not att:
         st.markdown(bdg("Complete steps 1 and 2 to preview", "info"), unsafe_allow_html=True)
         return
+
+    # --- Per-attendee name overrides stored in session state ---
+    if "name_overrides" not in st.session_state:
+        st.session_state["name_overrides"] = {}
+
+    # --- Generate All Certificates Button ---
+    if st.button("Generate All Certificates", use_container_width=True, key="gen_all_btn"):
+        _generate_preview_batch()
+
+    generated: List[CertificateOutput] = st.session_state.get("generated_certs", [])
+
+    # --- Individual attendee editor ---
+    st.markdown("**Edit Individual Attendee**")
+    name_list = [a.name for a in att]
+    selected_idx = st.selectbox(
+        "Select attendee",
+        options=range(len(name_list)),
+        format_func=lambda i: f"{i+1}. {name_list[i]}",
+        key="preview_attendee_select",
+    )
+
+    # Editable name
+    current_name = st.session_state["name_overrides"].get(
+        selected_idx, att[selected_idx].name
+    )
+    edited_name = st.text_input(
+        "Name on certificate",
+        value=current_name,
+        key=f"edit_name_{selected_idx}",
+    )
+    if edited_name != att[selected_idx].name:
+        st.session_state["name_overrides"][selected_idx] = edited_name
+    elif selected_idx in st.session_state["name_overrides"]:
+        del st.session_state["name_overrides"][selected_idx]
+
+    # Per-attendee font size and position overrides
+    col_fs, col_hp, col_vp = st.columns(3)
+    with col_fs:
+        override_fs = st.number_input(
+            "Font size (pt)",
+            min_value=10,
+            max_value=200,
+            value=st.session_state["font_size"],
+            key=f"override_fs_{selected_idx}",
+        )
+    with col_hp:
+        override_hp = st.slider(
+            "Horizontal position (%)",
+            min_value=0,
+            max_value=100,
+            value=50,
+            key=f"override_hp_{selected_idx}",
+            help="50 = centered. Lower = left, Higher = right.",
+        )
+    with col_vp:
+        override_vp = st.slider(
+            "Vertical position (%)",
+            min_value=0,
+            max_value=100,
+            value=st.session_state["vertical_position"],
+            key=f"override_vp_{selected_idx}",
+        )
+
+    # Live preview for selected attendee
     try:
         fc = FontConfiguration(
-            font_path="assets/fonts/Arial.ttf",
-            font_size=st.session_state["font_size"],
+            font_path=st.session_state["font_path"],
+            font_size=override_fs,
             font_color=FontConfiguration.parse_color(st.session_state["font_color"]),
         )
-        gen = CertificateGenerator(template_bytes=tb, template_format=st.session_state["template_format"], font_config=fc)
-        prev = gen.generate(att[0].name, vertical_position=st.session_state["vertical_position"], vertical_as_percentage=True)
-        if prev.format in ("png","jpg"):
-            st.image(prev.certificate, caption=f"Preview: {att[0].name}")
+        gen = CertificateGenerator(
+            template_bytes=tb,
+            template_format=st.session_state["template_format"],
+            font_config=fc,
+        )
+        prev = _generate_single_with_position(
+            gen, edited_name, override_hp, override_vp
+        )
+        if prev.format in ("png", "jpg"):
+            st.image(prev.certificate, caption=f"Preview: {edited_name}")
         elif prev.format == "pdf":
             doc = fitz.open(stream=prev.certificate, filetype="pdf")
-            pix = doc.load_page(0).get_pixmap(matrix=fitz.Matrix(2,2))
-            st.image(pix.tobytes("png"), caption=f"Preview: {att[0].name}")
+            pix = doc.load_page(0).get_pixmap(matrix=fitz.Matrix(2, 2))
+            st.image(pix.tobytes("png"), caption=f"Preview: {edited_name}")
             doc.close()
         st.markdown(bdg(f"{svg('check')} Looks good", "ok"), unsafe_allow_html=True)
     except Exception as e:
-        st.markdown(bdg(f"{svg('x-circle')} Preview failed: {e}", "err"), unsafe_allow_html=True)
+        st.markdown(
+            bdg(f"{svg('x-circle')} Preview failed: {e}", "err"),
+            unsafe_allow_html=True,
+        )
+
+    # --- Certificate Gallery (after batch generation) ---
+    if generated:
+        st.markdown("---")
+        st.markdown(f"**Generated Certificates ({len(generated)} total)**")
+        # Show in a grid of 3 columns
+        cols_per_row = 3
+        for row_start in range(0, len(generated), cols_per_row):
+            cols = st.columns(cols_per_row)
+            for col_idx, cert_idx in enumerate(
+                range(row_start, min(row_start + cols_per_row, len(generated)))
+            ):
+                cert = generated[cert_idx]
+                with cols[col_idx]:
+                    try:
+                        if cert.format in ("png", "jpg"):
+                            st.image(
+                                cert.certificate,
+                                caption=cert.attendee_name,
+                                use_container_width=True,
+                            )
+                        elif cert.format == "pdf":
+                            doc = fitz.open(
+                                stream=cert.certificate, filetype="pdf"
+                            )
+                            pix = doc.load_page(0).get_pixmap(
+                                matrix=fitz.Matrix(1.5, 1.5)
+                            )
+                            st.image(
+                                pix.tobytes("png"),
+                                caption=cert.attendee_name,
+                                use_container_width=True,
+                            )
+                            doc.close()
+                    except Exception as e:
+                        st.markdown(
+                            bdg(
+                                f"{svg('x-circle')} {cert.attendee_name}: {e}",
+                                "err",
+                            ),
+                            unsafe_allow_html=True,
+                        )
+
+
+def _generate_single_with_position(
+    gen: CertificateGenerator,
+    name: str,
+    horizontal_pct: int,
+    vertical_pct: int,
+) -> CertificateOutput:
+    """Generate a single certificate with custom horizontal and vertical position.
+
+    For horizontal positioning, we override the ImageProcessor's centering logic.
+    """
+    if gen._image_processor:
+        # Custom rendering with horizontal control
+        proc = gen._image_processor
+        bbox = proc._font.getbbox(name)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+
+        # Horizontal: 0=left edge, 50=center, 100=right edge
+        max_x = proc._width - text_width
+        x = int((horizontal_pct / 100) * max_x) if max_x > 0 else 0
+
+        # Vertical: percentage of template height
+        y = int((vertical_pct / 100) * proc._height) - text_height // 2
+        y = max(0, min(y, proc._height - text_height))
+
+        from PIL import ImageDraw
+
+        output = proc._template.copy()
+        draw = ImageDraw.Draw(output)
+        draw.text(
+            (x, y),
+            name,
+            font=proc._font,
+            fill=proc._font_config.font_color,
+        )
+        return CertificateOutput(
+            attendee_name=name, certificate=output, format=gen.format
+        )
+    else:
+        # PDF — use vertical only (horizontal always centered in PDF processor)
+        return gen.generate(
+            name, vertical_position=vertical_pct, vertical_as_percentage=True
+        )
+
+
+def _generate_preview_batch() -> None:
+    """Generate all certificates and store in session state for gallery display."""
+    tb = st.session_state["template_bytes"]
+    tf = st.session_state["template_format"]
+    att: List[AttendeeRecord] = st.session_state["attendees"]
+    overrides = st.session_state.get("name_overrides", {})
+
+    bar = st.progress(0)
+    status = st.empty()
+    status.text("Generating certificates...")
+
+    try:
+        fc = FontConfiguration(
+            font_path=st.session_state["font_path"],
+            font_size=st.session_state["font_size"],
+            font_color=FontConfiguration.parse_color(st.session_state["font_color"]),
+        )
+        gen = CertificateGenerator(
+            template_bytes=tb, template_format=tf, font_config=fc
+        )
+        # Apply name overrides
+        names = []
+        for i, a in enumerate(att):
+            names.append(overrides.get(i, a.name))
+
+        batch = gen.generate_batch(
+            names,
+            vertical_position=st.session_state["vertical_position"],
+            vertical_as_percentage=True,
+        )
+        st.session_state["generated_certs"] = batch.certificates
+        st.session_state["zip_bytes"] = _make_zip(batch.certificates)
+        bar.progress(1.0)
+        status.text(f"Done — {len(batch.certificates)} certificates generated.")
+        if batch.errors:
+            for err in batch.errors:
+                st.markdown(
+                    bdg(
+                        f"{svg('x-circle')} {err.attendee_name}: {err.error_message}",
+                        "err",
+                    ),
+                    unsafe_allow_html=True,
+                )
+    except Exception as e:
+        st.error(f"Generation failed: {e}")
 
 
 def render_step_send() -> None:
@@ -302,6 +625,29 @@ def render_step_send() -> None:
     body = st.session_state["email_body"].strip()
     sip = st.session_state["send_in_progress"]
     ready = all([tb, att, subj, body])
+
+    # Show download button if certificates were already generated in step 4
+    zb = st.session_state.get("zip_bytes")
+    if zb and not st.session_state["send_results"]:
+        st.markdown(bdg(f"{svg('check')} {len(st.session_state.get('generated_certs', []))} certificates ready", "ok"), unsafe_allow_html=True)
+        st.download_button(
+            "Download Certificates ZIP",
+            data=zb,
+            file_name="certificates.zip",
+            mime="application/zip",
+            use_container_width=True,
+        )
+        st.markdown("---")
+
+    # Show manual edits summary if any overrides exist
+    overrides = st.session_state.get("name_overrides", {})
+    if overrides:
+        with st.expander(f"✏️ {len(overrides)} name(s) manually edited (from Preview)"):
+            for idx, new_name in overrides.items():
+                original = att[idx].name if idx < len(att) else "?"
+                st.text(f"  {original}  →  {new_name}")
+            st.caption("These edits will be applied to the final certificates.")
+
     if not ready:
         missing = []
         if not tb: missing.append("Template")
@@ -312,7 +658,7 @@ def render_step_send() -> None:
         st.button("Send All", disabled=True, use_container_width=True)
         return
     if not st.session_state["show_confirm"] and not sip:
-        c1, c2 = st.columns([2,1])
+        c1, c2 = st.columns([2, 1])
         with c1:
             if st.button("Send All Certificates", use_container_width=True):
                 st.session_state["show_confirm"] = True
@@ -333,22 +679,26 @@ def render_step_send() -> None:
                 st.rerun()
     if st.session_state["send_results"]:
         _display_results()
-    elif st.session_state["zip_bytes"] and not st.session_state["send_results"]:
-        st.markdown(bdg(f"{svg('check')} Certificates generated", "ok"), unsafe_allow_html=True)
-        st.download_button("Download Certificates ZIP", data=st.session_state["zip_bytes"], file_name="certificates.zip", mime="application/zip", use_container_width=True)
+
+
+def _get_final_names(att: List[AttendeeRecord]) -> List[str]:
+    """Get the final name list applying any manual overrides from the preview step."""
+    overrides = st.session_state.get("name_overrides", {})
+    return [overrides.get(i, a.name) for i, a in enumerate(att)]
 
 
 def _generate_only() -> None:
     tb = st.session_state["template_bytes"]
     tf = st.session_state["template_format"]
     att: List[AttendeeRecord] = st.session_state["attendees"]
+    names = _get_final_names(att)
     bar = st.progress(0)
     status = st.empty()
     status.text("Generating...")
     try:
-        fc = FontConfiguration(font_path="assets/fonts/Arial.ttf", font_size=st.session_state["font_size"], font_color=FontConfiguration.parse_color(st.session_state["font_color"]))
+        fc = FontConfiguration(font_path=st.session_state["font_path"], font_size=st.session_state["font_size"], font_color=FontConfiguration.parse_color(st.session_state["font_color"]))
         gen = CertificateGenerator(template_bytes=tb, template_format=tf, font_config=fc)
-        batch = gen.generate_batch([a.name for a in att], vertical_position=st.session_state["vertical_position"], vertical_as_percentage=True)
+        batch = gen.generate_batch(names, vertical_position=st.session_state["vertical_position"], vertical_as_percentage=True)
         st.session_state["generated_certs"] = batch.certificates
         bar.progress(0.8)
         st.session_state["zip_bytes"] = _make_zip(batch.certificates)
@@ -363,13 +713,14 @@ def _execute_send() -> None:
     tb = st.session_state["template_bytes"]
     tf = st.session_state["template_format"]
     att: List[AttendeeRecord] = st.session_state["attendees"]
+    names = _get_final_names(att)
     bar = st.progress(0)
     status = st.empty()
     status.text(f"Generating {len(att)} certificates...")
     try:
-        fc = FontConfiguration(font_path="assets/fonts/Arial.ttf", font_size=st.session_state["font_size"], font_color=FontConfiguration.parse_color(st.session_state["font_color"]))
+        fc = FontConfiguration(font_path=st.session_state["font_path"], font_size=st.session_state["font_size"], font_color=FontConfiguration.parse_color(st.session_state["font_color"]))
         gen = CertificateGenerator(template_bytes=tb, template_format=tf, font_config=fc)
-        batch = gen.generate_batch([a.name for a in att], vertical_position=st.session_state["vertical_position"], vertical_as_percentage=True)
+        batch = gen.generate_batch(names, vertical_position=st.session_state["vertical_position"], vertical_as_percentage=True)
         st.session_state["generated_certs"] = batch.certificates
         bar.progress(0.3)
         status.text("Sending emails...")
@@ -381,9 +732,10 @@ def _execute_send() -> None:
                 cert_bytes.append(buf.getvalue())
             else:
                 cert_bytes.append(cert.certificate)
-        ok_names = {c.attendee_name for c in batch.certificates}
-        ok_att = [a for a in att if a.name in ok_names]
-        tmpl = EmailTemplate(subject=st.session_state["email_subject"], body=st.session_state["email_body"])
+        # Match certificates to attendees by index (same order as names list)
+        ok_cert_names = {c.attendee_name for c in batch.certificates}
+        ok_att = [a for i, a in enumerate(att) if names[i] in ok_cert_names]
+        tmpl = EmailTemplate(subject=st.session_state["email_subject"], body="Hi {name},\n\n" + st.session_state["email_body"])
         def prog(cur, tot):
             bar.progress(0.3 + (cur/tot)*0.65)
             status.text(f"Sending {cur}/{tot}...")

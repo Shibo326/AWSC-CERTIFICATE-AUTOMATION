@@ -9,7 +9,9 @@ from openpyxl import load_workbook
 
 from utils.models import AttendeeRecord, ParseResult, ValidationError
 
-EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
+EMAIL_REGEX = re.compile(
+    r"^[a-zA-Z0-9._%+\-']+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
+)
 
 
 class CSVParser:
