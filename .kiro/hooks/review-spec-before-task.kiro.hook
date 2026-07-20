@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Review Spec Before Task",
+  "description": "Before executing a spec task, reminds the agent to review the relevant requirements and design documents to ensure implementation aligns with the specification.",
+  "version": "1",
+  "when": {
+    "type": "preTaskExecution"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Before starting this task, review the relevant spec documents in .kiro/specs/ to ensure your implementation aligns with the requirements and design. Check: 1) The acceptance criteria for the relevant requirement 2) The correctness properties that must hold 3) The data models and component APIs from design.md. Follow project-standards.md coding conventions (type hints, docstrings, PEP 8)."
+  }
+}

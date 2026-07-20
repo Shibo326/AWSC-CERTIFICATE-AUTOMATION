@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Run Tests on Save",
+  "description": "Runs pytest automatically whenever a Python utility module is edited, catching regressions immediately during development.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "utils/*.py",
+      "tests/*.py"
+    ]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "python -m pytest tests/ -x --tb=short -q"
+  }
+}

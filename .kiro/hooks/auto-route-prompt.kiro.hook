@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Auto Route Prompt",
+  "description": "Automatically analyzes every chat message and delegates to the appropriate sub-agent (context-gatherer, general-task-execution, or requirement-detailer) based on the prompt content.",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Analyze the user's prompt and determine the best approach. Follow these routing rules:\n\n1. If the prompt is about understanding, investigating, or exploring the codebase → use the context-gatherer sub-agent first\n2. If the prompt is about implementing, fixing, refactoring, or creating code → use the general-task-execution sub-agent (gather context first if the area is unfamiliar)\n3. If the prompt is about defining requirements, breaking down features, or spec work → use the requirement-detailer sub-agent\n4. For compound tasks, chain agents in order: context-gather → then implement\n5. For simple direct questions, just answer directly without delegating\n\nAlways pick the right sub-agent automatically — the user should never need to specify which one to use."
+  }
+}

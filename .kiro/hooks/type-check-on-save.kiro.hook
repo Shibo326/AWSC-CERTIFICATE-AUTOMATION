@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Type Check on Save",
+  "description": "Runs mypy type checker on utility modules when Python files are edited, ensuring type hint correctness.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "utils/*.py"
+    ]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "python -m mypy utils/ --ignore-missing-imports --no-error-summary"
+  }
+}

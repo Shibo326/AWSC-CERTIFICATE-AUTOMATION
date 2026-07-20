@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Verify After Task",
+  "description": "Runs the full test suite after a spec task is completed, verifying that the implementation meets all correctness properties and no regressions were introduced.",
+  "version": "1",
+  "when": {
+    "type": "postTaskExecution"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "python -m pytest tests/ --tb=short -q"
+  }
+}
