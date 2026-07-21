@@ -256,11 +256,12 @@ def render_sidebar() -> None:
         st.divider()
 
         st.markdown(f"**{svg('mail')} Email Service**", unsafe_allow_html=True)
-        if EmailSender.check_credentials():
-            st.markdown(bdg(f"{svg('check')} Connected", "ok"), unsafe_allow_html=True)
+        if st.session_state.get("gmail_logged_in"):
+            st.markdown(bdg(f"{svg('check')} " + st.session_state.get("gmail_user", ""), "ok"), unsafe_allow_html=True)
+        elif EmailSender.check_credentials():
+            st.markdown(bdg(f"{svg('check')} Connected (config)", "ok"), unsafe_allow_html=True)
         else:
-            st.markdown(bdg(f"{svg('warn')} Not configured", "warn"), unsafe_allow_html=True)
-            st.caption("Add credentials to enable sending.")
+            st.markdown(bdg(f"{svg('warn')} Not logged in", "warn"), unsafe_allow_html=True)
         st.divider()
         st.markdown("**Workflow**")
         t = bool(st.session_state.get("template_bytes"))
@@ -417,12 +418,30 @@ def render_step_email() -> None:
     st.session_state["email_body"] = body
     st.markdown(bdg(f"{svg('zap')} Greeting 'Hi {{name}},' is auto-added", "info"), unsafe_allow_html=True)
 
-    # Gmail status indicator
-    if EmailSender.check_credentials():
-        st.markdown(bdg(f"{svg('check')} Gmail connected", "ok"), unsafe_allow_html=True)
+    # Gmail login form
+    st.markdown("---")
+    st.markdown(f"**{svg('mail')} Gmail Account**", unsafe_allow_html=True)
+    if st.session_state.get("gmail_logged_in"):
+        st.markdown(bdg(f"{svg('check')} Logged in as " + st.session_state.get("gmail_user", ""), "ok"), unsafe_allow_html=True)
+        if st.button("Logout", key="gmail_logout_btn"):
+            st.session_state["gmail_logged_in"] = False
+            st.session_state["gmail_user"] = ""
+            st.session_state["gmail_app_password"] = ""
+            st.rerun()
     else:
-        st.markdown(bdg(f"{svg('warn')} Gmail not configured", "warn"), unsafe_allow_html=True)
-        st.caption("Add credentials in .streamlit/secrets.toml to enable sending.")
+        st.caption("Enter your Gmail and App Password to send from your account.")
+        gmail_email = st.text_input("Gmail Address", key="gmail_email_input", placeholder="youremail@gmail.com")
+        gmail_pass = st.text_input("App Password", key="gmail_pass_input", type="password", placeholder="xxxx xxxx xxxx xxxx")
+        if st.button("Connect Gmail", key="gmail_login_btn", use_container_width=True):
+            if gmail_email and gmail_pass:
+                st.session_state["gmail_logged_in"] = True
+                st.session_state["gmail_user"] = gmail_email
+                st.session_state["gmail_app_password"] = gmail_pass
+                st.rerun()
+            else:
+                st.markdown(bdg(f"{svg('x-circle')} Both fields required", "err"), unsafe_allow_html=True)
+        with st.expander("How to get App Password"):
+            st.markdown("1. Go to myaccount.google.com\n2. Enable 2-Step Verification\n3. Search for App Passwords\n4. Generate one for Mail\n5. Copy the 16-char password")
 
 
 
@@ -433,13 +452,9 @@ def render_step_design() -> None:
 
     # --- Typography controls ---
     st.markdown("**Typography**")
-    fs = st.slider("Font Size (pt)", 10, 120, st.session_state["font_size"], key="cust_fs")
-    st.session_state["font_size"] = fs
     fc = st.color_picker("Font Color", st.session_state["font_color"], key="cust_fc")
     st.session_state["font_color"] = fc
     vp = st.slider("Name Position (%)", 0, 100, st.session_state["vertical_position"], key="cust_vp")
-    st.session_state["vertical_position"] = vp
-
     # Font selection from Google Fonts
     st.markdown("**Font**")
     available = get_available_fonts()
@@ -537,29 +552,29 @@ def render_step_design() -> None:
     # --- Controls: font size + position sliders ---
     st.markdown("**Adjust**")
 
-    override_fs = st.slider(
-        "Font Size (pt)", 10, 200,
-        st.session_state.get("prev_fs_val", st.session_state["font_size"]),
-        key="prev_fs_slider",
+    override_fs = st.number_input(
+        "Font Size (pt)", min_value=10, max_value=200, step=1,
+        value=st.session_state.get("prev_fs_val", st.session_state["font_size"]),
+        key="prev_fs_input",
     )
     if override_fs != st.session_state.get("prev_fs_val"):
         st.session_state["prev_fs_val"] = override_fs
 
     col_h, col_v = st.columns(2)
     with col_h:
-        override_hp = st.slider(
-            "Horizontal Position (%)", 0, 100,
-            st.session_state.get("prev_hp_val", 50),
-            key="prev_hp_slider",
+        override_hp = st.number_input(
+            "Horizontal Position (%)", min_value=0, max_value=100, step=1,
+            value=st.session_state.get("prev_hp_val", 50),
+            key="prev_hp_input",
             help="0=left, 50=center, 100=right",
         )
         if override_hp != st.session_state.get("prev_hp_val"):
             st.session_state["prev_hp_val"] = override_hp
     with col_v:
-        override_vp = st.slider(
-            "Vertical Position (%)", 0, 100,
-            st.session_state.get("prev_vp_val", st.session_state["vertical_position"]),
-            key="prev_vp_slider",
+        override_vp = st.number_input(
+            "Vertical Position (%)", min_value=0, max_value=100, step=1,
+            value=st.session_state.get("prev_vp_val", st.session_state["vertical_position"]),
+            key="prev_vp_input",
             help="0=top, 50=middle, 100=bottom",
         )
         if override_vp != st.session_state.get("prev_vp_val"):
@@ -971,7 +986,14 @@ def _execute_send() -> None:
             bar.progress(0.3 + (cur / tot) * 0.65)
             status.text(f"Sending {cur}/{tot}...")
 
-        sender = EmailSender()
+        from utils.models import GmailCredentials
+        creds = None
+        if st.session_state.get("gmail_logged_in"):
+            creds = GmailCredentials(
+                sender_email=st.session_state["gmail_user"],
+                app_password=st.session_state["gmail_app_password"],
+            )
+        sender = EmailSender(credentials=creds)
         result = sender.send_bulk(
             recipients=ok_att,
             certificate_data=cert_bytes,
