@@ -237,7 +237,7 @@ def init_session_state() -> None:
     defaults = {
         "template_file": None, "template_format": None, "template_bytes": None,
         "csv_file": None, "attendees": [], "csv_errors": [],
-        "font_size": 40, "font_color": "#FFFFFF", "font_path": "assets/fonts/Arial.ttf",
+        "font_size": 40, "font_color": "#1E293B", "font_path": "assets/fonts/Arial.ttf",
         "selected_font": "Arial (Default)", "vertical_position": 50,
         "email_subject": "Your Certificate of Achievement",
         "email_body": "Congratulations! Please find your certificate attached.\n\nBest regards,\nAWSC Global",
@@ -454,8 +454,6 @@ def render_step_design() -> None:
     st.markdown("**Typography**")
     fc = st.color_picker("Font Color", st.session_state["font_color"], key="cust_fc")
     st.session_state["font_color"] = fc
-    vp = st.slider("Name Position (%)", 0, 100, st.session_state["vertical_position"], key="cust_vp")
-    # Font selection from Google Fonts
     st.markdown("**Font**")
     available = get_available_fonts()
     current_font = st.session_state.get("selected_font", "Arial (Default)")
