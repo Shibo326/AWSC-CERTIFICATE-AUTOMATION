@@ -1,4 +1,4 @@
-[theme]
+﻿[theme]
 primaryColor = "#6366f1"
 backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f8fafc"
@@ -10,3 +10,7 @@ headless = true
 
 [browser]
 gatherUsageStats = false
+
+[client]
+showSidebarNavigation = false
+toolbarMode = "minimal"
