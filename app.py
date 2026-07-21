@@ -1,4 +1,4 @@
-"""AWSC GLOBAL PROJECT — Automated Certificate Generator & Email Sender.
+"""Prototype Cert Automation — Automated Certificate Generator & Email Sender.
 
 Modern Streamlit UI with Lucide SVG icons and professional light theme.
 """
@@ -146,7 +146,7 @@ def inject_css() -> None:
         margin-bottom: 2rem; text-align: center; border: 1px solid rgba(255,255,255,0.15);
         box-shadow: 0 20px 60px rgba(79,70,229,0.15);
     }
-    .hero h1 { color: #FFFFFF !important; font-size: 2rem; font-weight: 700; margin: 0; }
+    .hero h1, .hero h1 span, .hero [data-testid='stMarkdownContainer'] h1 { color: #FFFFFF !important; font-size: 2rem; font-weight: 700; margin: 0; text-shadow: none; }
     .hero p { color: rgba(255,255,255,0.85) !important; font-size: 1rem; margin-top: 0.4rem; }
     .step-hdr { display: flex; align-items: center; gap: 10px; margin: 2rem 0 0.8rem 0; padding-top: 1.5rem; border-top: 1px solid rgba(0,0,0,0.06); }
     .step-num {
@@ -216,13 +216,13 @@ def bdg(text: str, variant: str = "info") -> str:
 
 
 def main() -> None:
-    st.set_page_config(page_title="AWSC GLOBAL PROJECT", page_icon=None, layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(page_title="Prototype Cert Automation", page_icon=None, layout="wide", initial_sidebar_state="expanded")
     inject_css()
     init_session_state()
     render_sidebar()
     st.markdown(f'''
     <div class="hero">
-        <h1>{svg("globe")} AWSC GLOBAL PROJECT</h1>
+        <h1>{svg("globe")} Prototype Cert Automation</h1>
         <p>Automated Certificate Generation and Delivery System</p>
     </div>
     ''', unsafe_allow_html=True)
@@ -481,7 +481,7 @@ def render_step_design() -> None:
         f'{preview_font_family.replace(" ", "+")}&display=swap" rel="stylesheet">'
         f'<div class="font-preview-box">'
         f'<span style="font-family:\'{preview_font_family}\', serif; '
-        f'font-size:{min(fs, 32)}px; color:{fc};">Juan Dela Cruz</span>'
+        f'font-size:{min(st.session_state["font_size"], 32)}px; color:{st.session_state["font_color"]};">Juan Dela Cruz</span>'
         f'<div class="fp-label">Font Preview</div>'
         f'</div>',
         unsafe_allow_html=True,
@@ -780,142 +780,92 @@ def render_step_send() -> None:
     att: List[AttendeeRecord] = st.session_state["attendees"]
     subj = st.session_state["email_subject"].strip()
     body = st.session_state["email_body"].strip()
-    sip = st.session_state["send_in_progress"]
-    ready = all([tb, att, subj, body])
 
     if not tb or not att:
         st.markdown(bdg("Complete steps 1-4 first", "info"), unsafe_allow_html=True)
         return
 
-    # --- Generate All Certificates Button ---
-    if st.button("Generate All Certificates", use_container_width=True, key="gen_all_btn"):
+    # ===== SUB-STEP A: GENERATE =====
+    st.markdown("**Step 5a: Generate Certificates**")
+
+    if st.button("\U0001f4e6 Generate All", use_container_width=True, key="gen_all_btn"):
         _generate_preview_batch()
 
     generated: List[CertificateOutput] = st.session_state.get("generated_certs", [])
 
-    # --- Certificate Gallery (after batch generation) ---
     if generated:
+        st.success(f"\u2705 {len(generated)} certificates generated")
+        with st.expander(f"Preview ({len(generated)} certificates)", expanded=False):
+            cols_per_row = 4
+            for row_start in range(0, len(generated), cols_per_row):
+                cols = st.columns(cols_per_row)
+                for col_idx, cert_idx in enumerate(
+                    range(row_start, min(row_start + cols_per_row, len(generated)))
+                ):
+                    cert = generated[cert_idx]
+                    with cols[col_idx]:
+                        try:
+                            if cert.format in ("png", "jpg"):
+                                st.image(cert.certificate, caption=cert.attendee_name, use_container_width=True)
+                            elif cert.format == "pdf":
+                                doc = fitz.open(stream=cert.certificate, filetype="pdf")
+                                pix = doc.load_page(0).get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+                                st.image(pix.tobytes("png"), caption=cert.attendee_name, use_container_width=True)
+                                doc.close()
+                        except Exception as e:
+                            st.error(f"{cert.attendee_name}: {e}")
+
+        # ===== SUB-STEP B: DOWNLOAD ZIP =====
         st.markdown("---")
-        st.markdown(f"**Generated Certificates ({len(generated)} total)**")
-        st.caption("Click 'Edit' on any certificate to adjust the name, then re-generate.")
-        cols_per_row = 4
-        for row_start in range(0, len(generated), cols_per_row):
-            cols = st.columns(cols_per_row)
-            for col_idx, cert_idx in enumerate(
-                range(row_start, min(row_start + cols_per_row, len(generated)))
-            ):
-                cert = generated[cert_idx]
-                with cols[col_idx]:
-                    try:
-                        if cert.format in ("png", "jpg"):
-                            st.image(
-                                cert.certificate,
-                                caption=cert.attendee_name,
-                                use_container_width=True,
-                            )
-                        elif cert.format == "pdf":
-                            doc = fitz.open(
-                                stream=cert.certificate, filetype="pdf"
-                            )
-                            pix = doc.load_page(0).get_pixmap(
-                                matrix=fitz.Matrix(1.5, 1.5)
-                            )
-                            st.image(
-                                pix.tobytes("png"),
-                                caption=cert.attendee_name,
-                                use_container_width=True,
-                            )
-                            doc.close()
-                    except Exception as e:
-                        st.markdown(
-                            bdg(
-                                f"{svg('x-circle')} {cert.attendee_name}: {e}",
-                                "err",
-                            ),
-                            unsafe_allow_html=True,
-                        )
-                    # Edit button - inline name editor
-                    if st.button(
-                        "\u270f\ufe0f Edit",
-                        key=f"edit_cert_{cert_idx}",
-                        use_container_width=True,
-                    ):
-                        st.session_state[f"editing_cert_{cert_idx}"] = True
-                        st.rerun()
+        st.markdown("**Step 5b: Download ZIP**")
+        zb = st.session_state.get("zip_bytes")
+        if not zb:
+            # Generate zip if not yet created
+            zb = _make_zip(generated)
+            st.session_state["zip_bytes"] = zb
+        if zb:
+            st.download_button(
+                "\U0001f4e5 Download All Certificates (ZIP)",
+                data=zb,
+                file_name="certificates.zip",
+                mime="application/zip",
+                use_container_width=True,
+            )
 
-                    # Inline editor for this certificate
-                    if st.session_state.get(f"editing_cert_{cert_idx}", False):
-                        if "name_overrides" not in st.session_state:
-                            st.session_state["name_overrides"] = {}
-                        current = st.session_state["name_overrides"].get(
-                            cert_idx, att[cert_idx].name if cert_idx < len(att) else ""
-                        )
-                        new_name = st.text_input(
-                            "Name",
-                            value=current,
-                            key=f"inline_edit_name_{cert_idx}",
-                            label_visibility="collapsed",
-                        )
-                        if st.button("Save & Regenerate", key=f"save_cert_{cert_idx}"):
-                            if new_name != att[cert_idx].name:
-                                st.session_state["name_overrides"][cert_idx] = new_name
-                            elif cert_idx in st.session_state.get("name_overrides", {}):
-                                del st.session_state["name_overrides"][cert_idx]
-                            st.session_state[f"editing_cert_{cert_idx}"] = False
-                            _generate_preview_batch()
-                            st.rerun()
-
+        # ===== SUB-STEP C: SEND TO GMAIL =====
         st.markdown("---")
+        st.markdown("**Step 5c: Send to Gmail**")
 
-    # Show download button if certificates were already generated
-    zb = st.session_state.get("zip_bytes")
-    if zb and not st.session_state["send_results"]:
-        st.markdown(bdg(f"{svg('check')} {len(generated)} certificates ready", "ok"), unsafe_allow_html=True)
-        st.download_button(
-            "Download Certificates ZIP",
-            data=zb,
-            file_name="certificates.zip",
-            mime="application/zip",
-            use_container_width=True,
-        )
-        st.markdown("---")
+        if not st.session_state.get("gmail_connected"):
+            st.warning("Connect your Gmail in the sidebar first.")
+            return
 
-    # Show manual edits summary if any overrides exist
-    overrides = st.session_state.get("name_overrides", {})
-    if overrides:
-        with st.expander(f"\u270f\ufe0f {len(overrides)} name(s) manually edited"):
-            for idx, new_name in overrides.items():
-                original = att[idx].name if idx < len(att) else "?"
-                st.text(f"  {original}  \u2192  {new_name}")
-            st.caption("These edits will be applied to the final certificates.")
+        ready = all([subj, body])
+        if not ready:
+            missing = []
+            if not subj: missing.append("Subject")
+            if not body: missing.append("Body")
+            st.warning(f"Missing: {", ".join(missing)}")
+            return
 
-    if not ready:
-        missing = []
-        if not tb: missing.append("Template")
-        if not att: missing.append("CSV")
-        if not subj: missing.append("Subject")
-        if not body: missing.append("Body")
-        st.markdown(bdg(f"{svg('warn')} Missing: {', '.join(missing)}", "warn"), unsafe_allow_html=True)
-        st.button("Send All", disabled=True, use_container_width=True, key="send_all_disabled_btn")
-        return
-    if not st.session_state["show_confirm"] and not sip:
-        if st.button("Send via Email", use_container_width=True, key="send_email_btn"):
-            st.session_state["show_confirm"] = True
-            st.rerun()
-    if st.session_state["show_confirm"] and not sip:
-        st.warning(f"Sending to {len(att)} attendees. Confirm?")
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("Confirm Send", use_container_width=True, key="confirm_send_btn"):
-                st.session_state["show_confirm"] = False
-                _execute_send()
-        with c2:
-            if st.button("Cancel", use_container_width=True, key="cancel_send_btn"):
-                st.session_state["show_confirm"] = False
+        sip = st.session_state["send_in_progress"]
+        if not st.session_state["show_confirm"] and not sip:
+            if st.button("\U0001f4e7 Send via Email", use_container_width=True, key="send_email_btn"):
+                st.session_state["show_confirm"] = True
                 st.rerun()
-    if st.session_state["send_results"]:
-        _display_results()
-
+        if st.session_state["show_confirm"] and not sip:
+            st.warning(f"About to send {len(att)} emails from {st.session_state['gmail_sender']}. Confirm?")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("\u2705 Confirm Send", use_container_width=True, key="confirm_send_btn"):
+                    st.session_state["show_confirm"] = False
+                    _execute_send()
+            with c2:
+                if st.button("\u274c Cancel", use_container_width=True, key="cancel_send_btn"):
+                    st.session_state["show_confirm"] = False
+                    st.rerun()
+        if st.session_state["send_results"]:
+            _display_results()
 
 
 def _get_final_names(att: List[AttendeeRecord]) -> List[str]:
