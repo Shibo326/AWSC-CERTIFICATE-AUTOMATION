@@ -774,6 +774,63 @@ def _generate_preview_batch() -> None:
         st.error(f"Generation failed: {e}")
 
 
+
+def _show_ad_gate(gate_type: str) -> None:
+    """Show a 30-second ad countdown before unlocking an action."""
+    import streamlit.components.v1 as components
+
+    ad_html = f'''
+    <div id="ad-container" style="
+        background: linear-gradient(135deg, #1e1b4b, #312e81);
+        border-radius: 12px; padding: 24px; text-align: center;
+        border: 1px solid rgba(99,102,241,0.3); margin: 8px 0;">
+        <div style="color:#a5b4fc; font-size:0.75rem; text-transform:uppercase;
+            letter-spacing:0.1em; margin-bottom:8px;">SPONSORED</div>
+        <div style="color:#e2e8f0; font-size:1rem; font-weight:600; margin-bottom:4px;">
+            Support Prototype Cert Automation</div>
+        <div style="color:#94a3b8; font-size:0.8rem; margin-bottom:16px;">
+            This free tool is supported by short ads. Thank you for waiting!</div>
+        <div style="
+            width: 100%; height: 120px; background: rgba(255,255,255,0.05);
+            border-radius: 8px; display: flex; align-items: center;
+            justify-content: center; color: #64748b; font-size: 0.8rem;
+            border: 1px dashed rgba(255,255,255,0.1); margin-bottom: 16px;">
+            [ Ad Space - Your ad here ]</div>
+        <div id="timer" style="color:#fbbf24; font-size: 1.5rem; font-weight: 700;">30</div>
+        <div style="color:#94a3b8; font-size:0.75rem; margin-top:4px;">seconds remaining</div>
+        <div style="margin-top:12px; background:rgba(255,255,255,0.1); border-radius:20px;
+            height:6px; overflow:hidden;">
+            <div id="progress" style="height:100%; background:linear-gradient(90deg,#7c3aed,#a855f7);
+                width:0%; transition: width 1s linear;"></div>
+        </div>
+    </div>
+    <script>
+        let seconds = 30;
+        const timer = document.getElementById('timer');
+        const progress = document.getElementById('progress');
+        const interval = setInterval(() => {{
+            seconds--;
+            timer.textContent = seconds;
+            progress.style.width = ((30-seconds)/30*100) + '%';
+            if (seconds <= 0) {{
+                clearInterval(interval);
+                timer.textContent = '\u2705';
+                timer.style.color = '#34d399';
+                // Send message to Streamlit
+                window.parent.postMessage({{type: 'ad_complete', gate: '{gate_type}'}}, '*');
+            }}
+        }}, 1000);
+    </script>
+    '''
+    components.html(ad_html, height=280)
+
+    # Button appears after they see the ad (manual unlock since JS->Python is limited)
+    st.caption("\u2b06\ufe0f Wait 30 seconds, then click below:")
+    if st.button("\u2705 I watched the ad - Unlock", key=f"unlock_{{gate_type}}", use_container_width=True):
+        st.session_state[f"ad_watched_{{gate_type}}"] = True
+        st.rerun()
+
+
 def render_step_send() -> None:
     step_hdr(5, "Generate and Deliver", "send")
     tb = st.session_state["template_bytes"]
@@ -824,13 +881,17 @@ def render_step_send() -> None:
             zb = _make_zip(generated)
             st.session_state["zip_bytes"] = zb
         if zb:
-            st.download_button(
-                "\U0001f4e5 Download All Certificates (ZIP)",
-                data=zb,
-                file_name="certificates.zip",
-                mime="application/zip",
-                use_container_width=True,
-            )
+            if st.session_state.get("ad_watched_download"):
+                st.download_button(
+                    "\U0001f4e5 Download All Certificates (ZIP)",
+                    data=zb,
+                    file_name="certificates.zip",
+                    mime="application/zip",
+                    use_container_width=True,
+                )
+                st.session_state["ad_watched_download"] = False
+            else:
+                _show_ad_gate("download")
 
         # ===== SUB-STEP C: SEND TO GMAIL =====
         st.markdown("---")
