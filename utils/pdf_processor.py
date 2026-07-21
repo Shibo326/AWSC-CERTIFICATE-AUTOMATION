@@ -1,6 +1,7 @@
 """PDF processor for certificate name overlay using ReportLab and PyMuPDF."""
 
 import io
+import uuid
 from typing import Optional, Tuple, Union
 
 import fitz  # PyMuPDF
@@ -32,7 +33,7 @@ class PDFProcessor:
         """
         self._template_path = template_path
         self._font_config = font_config
-        self._font_name = "CertFlowFont"
+        self._font_name = f"CertFlow_{uuid.uuid4().hex[:8]}"
 
         # Validate PDF template
         try:

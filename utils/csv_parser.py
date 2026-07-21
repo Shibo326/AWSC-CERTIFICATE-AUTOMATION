@@ -48,7 +48,7 @@ class CSVParser:
         column_map = self._validate_headers(headers)
 
         # Parse rows
-        records: List[AttendeeRecord] = []
+        records_with_rows: List[Tuple[int, AttendeeRecord]] = []
         errors: List[ValidationError] = []
         row_number = 1  # 1-based, header is row 0
 
@@ -69,11 +69,11 @@ class CSVParser:
             # Validate row
             record, row_errors = self._validate_row(row_number, name, email)
             if record:
-                records.append(record)
+                records_with_rows.append((row_number, record))
             errors.extend(row_errors)
 
         # Detect duplicates
-        records, duplicate_errors = self._detect_duplicates(records)
+        records, duplicate_errors = self._detect_duplicates(records_with_rows)
         errors.extend(duplicate_errors)
 
         return ParseResult(records=records, errors=errors)
@@ -156,12 +156,12 @@ class CSVParser:
         return AttendeeRecord(name=name, email=email), []
 
     def _detect_duplicates(
-        self, records: List[AttendeeRecord]
+        self, records_with_rows: List[Tuple[int, AttendeeRecord]]
     ) -> Tuple[List[AttendeeRecord], List[ValidationError]]:
         """Detect duplicate emails (case-insensitive), keeping first occurrence.
 
         Args:
-            records: List of validated attendee records.
+            records_with_rows: List of (row_number, AttendeeRecord) tuples.
 
         Returns:
             Tuple of (deduplicated records, list of duplicate errors).
@@ -170,10 +170,8 @@ class CSVParser:
         deduplicated: List[AttendeeRecord] = []
         duplicate_errors: List[ValidationError] = []
 
-        for i, record in enumerate(records):
+        for row_num, record in records_with_rows:
             email_lower = record.email.lower()
-            # header is row 1, data starts at row 2
-            row_num = i + 2
 
             if email_lower in seen_emails:
                 duplicate_errors.append(
@@ -224,7 +222,7 @@ class CSVParser:
         column_map = self._validate_headers(headers)
 
         # Parse data rows
-        records: List[AttendeeRecord] = []
+        records_with_rows: List[Tuple[int, AttendeeRecord]] = []
         errors: List[ValidationError] = []
 
         for row_number, row in enumerate(rows[1:], start=2):
@@ -252,11 +250,11 @@ class CSVParser:
             # Validate row
             record, row_errors = self._validate_row(row_number, name, email)
             if record:
-                records.append(record)
+                records_with_rows.append((row_number, record))
             errors.extend(row_errors)
 
         # Detect duplicates
-        records, duplicate_errors = self._detect_duplicates(records)
+        records, duplicate_errors = self._detect_duplicates(records_with_rows)
         errors.extend(duplicate_errors)
 
         return ParseResult(records=records, errors=errors)

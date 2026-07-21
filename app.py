@@ -59,58 +59,185 @@ def svg(name: str) -> str:
     return ICONS.get(name, "")
 
 
+def get_theme() -> str:
+    """Return current theme from session state. Defaults to 'dark'."""
+    if "theme_mode" not in st.session_state:
+        st.session_state["theme_mode"] = "dark"
+    return st.session_state["theme_mode"]
+
+
+
 def inject_css() -> None:
-    st.markdown("""
+    """Inject theme-aware and responsive CSS."""
+    theme = get_theme()
+    is_dark = theme == "dark"
+
+    if is_dark:
+        bg_primary = "#0E1117"
+        bg_secondary = "#1A1F2E"
+        bg_card = "#141b2d"
+        text_primary = "#FAFAFA"
+        text_secondary = "#94a3b8"
+        text_muted = "#64748b"
+        border_color = "rgba(255,255,255,0.08)"
+        hero_bg = "linear-gradient(135deg, #1e3a5f 0%, #0f2027 50%, #203a43 100%)"
+        hero_border = "rgba(255,255,255,0.05)"
+        hero_shadow = "rgba(0,0,0,0.4)"
+        hero_title = "#f0f4f8"
+        hero_subtitle = "rgba(240,244,248,0.7)"
+        step_num_bg = "linear-gradient(135deg, #1e3a5f, #2d5a7b)"
+        step_num_color = "#a8d0e6"
+        step_lbl_color = "#e2e8f0"
+        uploader_border = "rgba(45,90,123,0.4)"
+        uploader_hover = "rgba(45,90,123,0.8)"
+        dl_btn_bg = "linear-gradient(135deg, #1e3a5f, #2d5a7b)"
+        dl_btn_color = "#e2e8f0"
+        sidebar_title_color = "#a8d0e6"
+        sidebar_bg = "#161B22"
+        font_preview_bg = "#1e293b"
+        font_preview_border = "rgba(255,255,255,0.1)"
+        input_bg = "#1A1F2E"
+        btn_bg = "#1e293b"
+        btn_border = "rgba(255,255,255,0.1)"
+        btn_text = "#e2e8f0"
+        check_color = "#10B981"
+    else:
+        bg_primary = "#FFFFFF"
+        bg_secondary = "#F8FAFC"
+        bg_card = "#F1F5F9"
+        text_primary = "#1E293B"
+        text_secondary = "#475569"
+        text_muted = "#64748b"
+        border_color = "rgba(0,0,0,0.1)"
+        hero_bg = "linear-gradient(135deg, #667eea 0%, #764ba2 50%, #6B73FF 100%)"
+        hero_border = "rgba(255,255,255,0.2)"
+        hero_shadow = "rgba(102,126,234,0.15)"
+        hero_title = "#FFFFFF"
+        hero_subtitle = "rgba(255,255,255,0.85)"
+        step_num_bg = "linear-gradient(135deg, #667eea, #764ba2)"
+        step_num_color = "#FFFFFF"
+        step_lbl_color = "#1E293B"
+        uploader_border = "rgba(102,126,234,0.3)"
+        uploader_hover = "rgba(102,126,234,0.6)"
+        dl_btn_bg = "linear-gradient(135deg, #667eea, #764ba2)"
+        dl_btn_color = "#FFFFFF"
+        sidebar_title_color = "#4F46E5"
+        sidebar_bg = "#F1F5F9"
+        font_preview_bg = "#F8FAFC"
+        font_preview_border = "rgba(0,0,0,0.08)"
+        input_bg = "#FFFFFF"
+        btn_bg = "#F8FAFC"
+        btn_border = "rgba(0,0,0,0.12)"
+        btn_text = "#1E293B"
+        check_color = "#059669"
+
+    st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    .stApp { font-family: 'Inter', sans-serif; }
-    #MainMenu, footer, header { visibility: hidden; }
-
-    .hero {
-        background: linear-gradient(135deg, #1e3a5f 0%, #0f2027 50%, #203a43 100%);
-        border-radius: 16px; padding: 2.5rem 2rem; margin-bottom: 2rem;
-        text-align: center; border: 1px solid rgba(255,255,255,0.05);
-        box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-    }
-    .hero h1 { color: #f0f4f8; font-size: 2rem; font-weight: 700; margin: 0; letter-spacing: 1px; }
-    .hero p { color: rgba(240,244,248,0.7); font-size: 1rem; margin-top: 0.4rem; font-weight: 300; }
-
-    .step-hdr { display: flex; align-items: center; gap: 10px; margin: 1.5rem 0 0.8rem 0; }
-    .step-num {
-        background: linear-gradient(135deg, #1e3a5f, #2d5a7b);
-        color: #a8d0e6; width: 28px; height: 28px; border-radius: 6px;
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stAppViewBlockContainer"],
+    .main, .main .block-container {{
+        background-color: {bg_primary} !important; color: {text_primary} !important;
+        font-family: 'Inter', sans-serif !important;
+    }}
+    #MainMenu, footer {{ visibility: hidden; }}
+    .stApp p, .stApp span, .stApp label, .stApp li, .stApp h1, .stApp h2, .stApp h3, .stApp h4,
+    [data-testid="stMarkdownContainer"] p, [data-testid="stMarkdownContainer"] span,
+    [data-testid="stText"] {{ color: {text_primary} !important; }}
+    [data-testid="stCaptionContainer"] p, .stApp small {{ color: {text_muted} !important; }}
+    section[data-testid="stSidebar"], section[data-testid="stSidebar"] > div,
+    [data-testid="stSidebarContent"] {{ background-color: {sidebar_bg} !important; }}
+    section[data-testid="stSidebar"] p, section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] label, section[data-testid="stSidebar"] li,
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] span {{
+        color: {text_primary} !important;
+    }}
+    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {{ color: {text_muted} !important; }}
+    section[data-testid="stSidebar"] hr {{ border-color: {border_color} !important; }}
+    section[data-testid="stSidebar"] .stButton > button {{
+        background-color: {btn_bg} !important; color: {btn_text} !important;
+        border: 1px solid {btn_border} !important; border-radius: 8px;
+    }}
+    section[data-testid="stSidebar"] svg {{ color: {text_primary} !important; }}
+    [data-baseweb="select"] > div, [data-baseweb="input"] > div, [data-baseweb="base-input"] {{
+        background-color: {input_bg} !important; border-color: {border_color} !important;
+    }}
+    [data-baseweb="input"] input, [data-baseweb="select"] input,
+    [data-baseweb="select"] [data-testid="stMarkdownContainer"] p {{ color: {text_primary} !important; }}
+    [data-baseweb="textarea"] textarea {{ background-color: {input_bg} !important; color: {text_primary} !important; }}
+    [data-baseweb="popover"], [data-baseweb="menu"], ul[role="listbox"] {{ background-color: {bg_secondary} !important; }}
+    ul[role="listbox"] li {{ color: {text_primary} !important; }}
+    [data-testid="stSlider"] p, [data-testid="stSlider"] [data-testid="stThumbValue"],
+    [data-testid="stSlider"] [data-testid="stTickBarMin"],
+    [data-testid="stSlider"] [data-testid="stTickBarMax"] {{ color: {text_primary} !important; }}
+    [data-testid="stExpander"] {{ border-color: {border_color} !important; background-color: {bg_secondary} !important; }}
+    [data-testid="stExpander"] summary, [data-testid="stExpander"] summary span {{ color: {text_primary} !important; }}
+    .stApp .stButton > button {{
+        border-radius: 8px; font-weight: 600; background-color: {btn_bg} !important;
+        color: {btn_text} !important; border: 1px solid {btn_border} !important;
+    }}
+    .stApp .stButton > button:hover {{ border-color: {uploader_hover} !important; }}
+    .stDownloadButton > button {{
+        background: {dl_btn_bg} !important; color: {dl_btn_color} !important;
+        border: none !important; border-radius: 8px; font-weight: 600;
+    }}
+    @media (max-width: 768px) {{
+        .hero {{ padding: 1.5rem 1rem !important; margin-bottom: 1.2rem !important; }}
+        .hero h1 {{ font-size: 1.4rem !important; }}
+        .hero p {{ font-size: 0.85rem !important; }}
+        .kpi {{ padding: 0.8rem !important; }}
+        .kpi-val {{ font-size: 1.3rem !important; }}
+        .step-hdr {{ margin: 1rem 0 0.5rem 0 !important; }}
+        .step-lbl {{ font-size: 0.9rem !important; }}
+        [data-testid="stHorizontalBlock"] {{ flex-wrap: wrap !important; }}
+        [data-testid="stHorizontalBlock"] > div {{ flex: 1 1 100% !important; min-width: 100% !important; }}
+        section[data-testid="stSidebar"] {{ width: 100% !important; }}
+        .stButton > button, .stDownloadButton > button {{ min-height: 44px; }}
+        div[data-testid="stFileUploader"] {{ padding: 0.8rem; }}
+    }}
+    @media (min-width: 769px) and (max-width: 1024px) {{
+        .hero h1 {{ font-size: 1.7rem !important; }}
+        .kpi-val {{ font-size: 1.5rem !important; }}
+    }}
+    .hero {{
+        background: {hero_bg}; border-radius: 16px; padding: 2.5rem 2rem;
+        margin-bottom: 2rem; text-align: center; border: 1px solid {hero_border};
+        box-shadow: 0 20px 60px {hero_shadow};
+    }}
+    .hero h1 {{ color: {hero_title} !important; font-size: 2rem; font-weight: 700; margin: 0; }}
+    .hero p {{ color: {hero_subtitle} !important; font-size: 1rem; margin-top: 0.4rem; }}
+    .step-hdr {{ display: flex; align-items: center; gap: 10px; margin: 1.5rem 0 0.8rem 0; }}
+    .step-num {{
+        background: {step_num_bg}; color: {step_num_color} !important;
+        width: 28px; height: 28px; border-radius: 6px;
         display: inline-flex; align-items: center; justify-content: center;
         font-weight: 700; font-size: 0.8rem;
-    }
-    .step-lbl { color: #e2e8f0; font-size: 1.05rem; font-weight: 600; }
-
-    .badge {
-        display: inline-flex; align-items: center; gap: 5px;
-        padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 500;
-    }
-    .badge-ok { background: rgba(16,185,129,0.1); color: #10B981; border: 1px solid rgba(16,185,129,0.25); }
-    .badge-warn { background: rgba(245,158,11,0.1); color: #F59E0B; border: 1px solid rgba(245,158,11,0.25); }
-    .badge-err { background: rgba(239,68,68,0.1); color: #EF4444; border: 1px solid rgba(239,68,68,0.25); }
-    .badge-info { background: rgba(99,102,241,0.1); color: #818CF8; border: 1px solid rgba(99,102,241,0.25); }
-
-    .kpi { background: #141b2d; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 1.2rem; text-align: center; }
-    .kpi-val { font-size: 1.8rem; font-weight: 700; }
-    .kpi-lbl { font-size: 0.78rem; color: #64748b; margin-top: 2px; }
-
-    div[data-testid="stFileUploader"] {
-        border: 2px dashed rgba(45,90,123,0.4); border-radius: 10px; padding: 0.3rem;
-    }
-    div[data-testid="stFileUploader"]:hover { border-color: rgba(45,90,123,0.8); }
-
-    .stButton > button { border-radius: 8px; font-weight: 600; letter-spacing: 0.3px; }
-    .stDownloadButton > button {
-        background: linear-gradient(135deg, #1e3a5f, #2d5a7b); color: #e2e8f0;
-        border: none; border-radius: 8px; font-weight: 600;
-    }
-
-    .sidebar-title { color: #a8d0e6; font-size: 1.3rem; font-weight: 700; letter-spacing: 1px; text-align: center; }
+    }}
+    .step-lbl {{ color: {step_lbl_color} !important; font-size: 1.05rem; font-weight: 600; }}
+    .badge {{ display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 500; }}
+    .badge-ok {{ background: rgba(16,185,129,0.12); color: {check_color} !important; border: 1px solid rgba(16,185,129,0.3); }}
+    .badge-warn {{ background: rgba(245,158,11,0.12); color: #D97706 !important; border: 1px solid rgba(245,158,11,0.3); }}
+    .badge-err {{ background: rgba(239,68,68,0.12); color: #DC2626 !important; border: 1px solid rgba(239,68,68,0.3); }}
+    .badge-info {{ background: rgba(99,102,241,0.12); color: #6366F1 !important; border: 1px solid rgba(99,102,241,0.3); }}
+    .badge svg {{ color: inherit !important; }}
+    .kpi {{ background: {bg_card}; border: 1px solid {border_color}; border-radius: 10px; padding: 1.2rem; text-align: center; }}
+    .kpi-val {{ font-size: 1.8rem; font-weight: 700; }}
+    .kpi-lbl {{ font-size: 0.78rem; color: {text_muted} !important; margin-top: 2px; }}
+    div[data-testid="stFileUploader"] {{
+        border: 2px dashed {uploader_border}; border-radius: 10px; padding: 0.3rem;
+        background-color: {bg_secondary} !important;
+    }}
+    div[data-testid="stFileUploader"]:hover {{ border-color: {uploader_hover}; }}
+    .sidebar-title {{ color: {sidebar_title_color} !important; font-size: 1.3rem; font-weight: 700; text-align: center; }}
+    .font-preview-box {{
+        background: {font_preview_bg}; border: 1px solid {font_preview_border};
+        border-radius: 8px; padding: 16px; margin: 8px 0; text-align: center;
+    }}
+    .font-preview-box .fp-label {{ color: {text_muted} !important; font-size: 0.7rem; margin-top: 6px; }}
+    img {{ max-width: 100%; height: auto; }}
     </style>
     """, unsafe_allow_html=True)
+
 
 
 def step_hdr(num: int, label: str, icon_name: str) -> None:
@@ -149,6 +276,7 @@ def init_session_state() -> None:
         "email_body": "Congratulations! Please find your certificate attached.\n\nBest regards,\nAWSC Global",
         "send_in_progress": False, "show_confirm": False,
         "send_results": None, "generated_certs": [], "zip_bytes": None,
+        "theme_mode": "dark",
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -160,6 +288,16 @@ def render_sidebar() -> None:
         st.markdown(f'<div class="sidebar-title">{svg("globe")} AWSC GLOBAL</div>', unsafe_allow_html=True)
         st.caption(f"v{APP_VERSION}")
         st.divider()
+
+        # Theme toggle
+        theme = get_theme()
+        theme_icon = "☀️" if theme == "dark" else "🌙"
+        theme_label = "Light Mode" if theme == "dark" else "Dark Mode"
+        if st.button(f"{theme_icon} {theme_label}", key="theme_toggle", use_container_width=True):
+            st.session_state["theme_mode"] = "light" if theme == "dark" else "dark"
+            st.rerun()
+        st.divider()
+
         st.markdown(f"**{svg('mail')} Email Service**", unsafe_allow_html=True)
         if EmailSender.check_credentials():
             st.markdown(bdg(f"{svg('check')} Connected", "ok"), unsafe_allow_html=True)
@@ -226,7 +364,15 @@ def render_step_upload_csv() -> None:
                 file_bytes = uploaded.read()
                 result = parser.parse_xlsx(file_bytes)
             else:
-                content = uploaded.read().decode("utf-8")
+                raw_bytes = uploaded.read()
+                # Handle BOM and common encodings
+                try:
+                    content = raw_bytes.decode("utf-8-sig")  # Handles UTF-8 with BOM
+                except UnicodeDecodeError:
+                    try:
+                        content = raw_bytes.decode("latin-1")
+                    except UnicodeDecodeError:
+                        content = raw_bytes.decode("utf-8", errors="replace")
                 result = parser.parse(content)
             st.session_state["attendees"] = result.records
             st.session_state["csv_errors"] = result.errors
@@ -279,10 +425,13 @@ def render_step_upload_csv() -> None:
             if result.records:
                 st.markdown(bdg(f"{svg('check')} Attendees loaded", "ok"), unsafe_allow_html=True)
                 with st.expander("Preview list"):
-                    for i, r in enumerate(result.records[:10], 1):
-                        st.text(f"  {i}. {r.name}  |  {r.email}")
-                    if len(result.records) > 10:
-                        st.caption(f"  ... +{len(result.records)-10} more")
+                    # Build scrollable list showing all attendees
+                    list_html = '<div style="max-height:300px; overflow-y:auto; padding:8px; border-radius:6px;">'
+                    for i, r in enumerate(result.records, 1):
+                        list_html += f'<div style="padding:4px 0; border-bottom:1px solid rgba(128,128,128,0.15); font-size:0.85rem;">{i}. {r.name} &nbsp;|&nbsp; <span style="opacity:0.7;">{r.email}</span></div>'
+                    list_html += '</div>'
+                    st.markdown(list_html, unsafe_allow_html=True)
+                    st.caption(f"Total: {len(result.records)} attendees")
         except ValueError as e:
             st.markdown(bdg(f"{svg('x-circle')} {e}", "err"), unsafe_allow_html=True)
     elif st.session_state["attendees"]:
@@ -294,11 +443,11 @@ def render_step_customize() -> None:
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("**Typography**")
-        fs = st.slider("Font Size (pt)", 10, 120, st.session_state["font_size"], key="fs2")
+        fs = st.slider("Font Size (pt)", 10, 120, st.session_state["font_size"], key="cust_fs")
         st.session_state["font_size"] = fs
-        fc = st.color_picker("Font Color", st.session_state["font_color"], key="fc2")
+        fc = st.color_picker("Font Color", st.session_state["font_color"], key="cust_fc")
         st.session_state["font_color"] = fc
-        vp = st.slider("Name Position (%)", 0, 100, st.session_state["vertical_position"], key="vp2")
+        vp = st.slider("Name Position (%)", 0, 100, st.session_state["vertical_position"], key="cust_vp")
         st.session_state["vertical_position"] = vp
 
         # Font selection from Google Fonts
@@ -325,11 +474,10 @@ def render_step_customize() -> None:
         st.markdown(
             f'<link href="https://fonts.googleapis.com/css2?family='
             f'{preview_font_family.replace(" ", "+")}&display=swap" rel="stylesheet">'
-            f'<div style="background:#1e293b; border:1px solid rgba(255,255,255,0.1); '
-            f'border-radius:8px; padding:16px; margin:8px 0; text-align:center;">'
+            f'<div class="font-preview-box">'
             f'<span style="font-family:\'{preview_font_family}\', serif; '
             f'font-size:{min(fs, 32)}px; color:{fc};">Juan Dela Cruz</span>'
-            f'<div style="color:#64748b; font-size:0.7rem; margin-top:6px;">Font Preview</div>'
+            f'<div class="fp-label">Font Preview</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -363,12 +511,11 @@ def render_step_customize() -> None:
 
     with c2:
         st.markdown("**Email Content**")
-        subj = st.text_input("Subject", st.session_state["email_subject"], key="es2")
+        subj = st.text_input("Subject", st.session_state["email_subject"], key="cust_subj")
         st.session_state["email_subject"] = subj
         st.markdown(
-            '<div style="background:#1e293b; border:1px solid rgba(255,255,255,0.1); '
-            'border-radius:8px 8px 0 0; padding:10px 14px; margin-top:8px; '
-            'font-family:monospace; font-size:0.9rem; color:#94a3b8;">'
+            '<div class="font-preview-box" style="border-radius:8px 8px 0 0; '
+            'text-align:left; font-family:monospace; font-size:0.9rem;">'
             'Hi {name},</div>',
             unsafe_allow_html=True,
         )
@@ -376,7 +523,7 @@ def render_step_customize() -> None:
             "Body (after greeting)",
             st.session_state["email_body"],
             height=100,
-            key="eb2",
+            key="cust_body",
             label_visibility="collapsed",
         )
         st.session_state["email_body"] = body
@@ -425,35 +572,46 @@ def render_step_preview() -> None:
     elif selected_idx in st.session_state["name_overrides"]:
         del st.session_state["name_overrides"][selected_idx]
 
-    # Per-attendee font size and position overrides
-    col_fs, col_hp, col_vp = st.columns(3)
-    with col_fs:
-        override_fs = st.number_input(
-            "Font size (pt)",
-            min_value=10,
-            max_value=200,
-            value=st.session_state["font_size"],
-            key=f"override_fs_{selected_idx}",
-        )
-    with col_hp:
-        override_hp = st.slider(
-            "Horizontal position (%)",
-            min_value=0,
-            max_value=100,
-            value=50,
-            key=f"override_hp_{selected_idx}",
-            help="50 = centered. Lower = left, Higher = right.",
-        )
-    with col_vp:
-        override_vp = st.slider(
-            "Vertical position (%)",
-            min_value=0,
-            max_value=100,
-            value=st.session_state["vertical_position"],
-            key=f"override_vp_{selected_idx}",
-        )
+    # --- Controls: font size + position sliders ---
+    st.markdown("**Adjust**")
 
-    # Live preview for selected attendee
+    override_fs = st.slider(
+        "Font Size (pt)", 10, 200,
+        st.session_state.get("prev_fs_val", st.session_state["font_size"]),
+        key="prev_fs_slider",
+    )
+    if override_fs != st.session_state.get("prev_fs_val"):
+        st.session_state["prev_fs_val"] = override_fs
+
+    col_h, col_v = st.columns(2)
+    with col_h:
+        override_hp = st.slider(
+            "Horizontal Position (%)", 0, 100,
+            st.session_state.get("prev_hp_val", 50),
+            key="prev_hp_slider",
+            help="0=left, 50=center, 100=right",
+        )
+        if override_hp != st.session_state.get("prev_hp_val"):
+            st.session_state["prev_hp_val"] = override_hp
+    with col_v:
+        override_vp = st.slider(
+            "Vertical Position (%)", 0, 100,
+            st.session_state.get("prev_vp_val", st.session_state["vertical_position"]),
+            key="prev_vp_slider",
+            help="0=top, 50=middle, 100=bottom",
+        )
+        if override_vp != st.session_state.get("prev_vp_val"):
+            st.session_state["prev_vp_val"] = override_vp
+
+    # --- Click on image to reposition ---
+    st.markdown(
+        '<div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.3); '
+        'border-radius:8px; padding:8px 12px; margin:8px 0; font-size:0.82rem; color:#a5b4fc;">'
+        '🖱️ <strong>Click on the preview image</strong> to set name position directly.</div>',
+        unsafe_allow_html=True,
+    )
+
+    # --- Generate preview and show clickable image ---
     try:
         fc = FontConfiguration(
             font_path=st.session_state["font_path"],
@@ -468,13 +626,43 @@ def render_step_preview() -> None:
         prev = _generate_single_with_position(
             gen, edited_name, override_hp, override_vp
         )
+
+        # Convert to PIL Image for streamlit_image_coordinates
         if prev.format in ("png", "jpg"):
-            st.image(prev.certificate, caption=f"Preview: {edited_name}")
+            preview_img = prev.certificate.copy()
         elif prev.format == "pdf":
             doc = fitz.open(stream=prev.certificate, filetype="pdf")
             pix = doc.load_page(0).get_pixmap(matrix=fitz.Matrix(2, 2))
-            st.image(pix.tobytes("png"), caption=f"Preview: {edited_name}")
+            preview_img = Image.open(io.BytesIO(pix.tobytes("png")))
             doc.close()
+        else:
+            preview_img = None
+
+        if preview_img:
+            from streamlit_image_coordinates import streamlit_image_coordinates
+
+            # Resize for display (max 800px wide to fit layout)
+            display_w = min(800, preview_img.width)
+            scale = display_w / preview_img.width
+            display_h = int(preview_img.height * scale)
+            display_img = preview_img.resize((display_w, display_h), Image.LANCZOS)
+
+            coords = streamlit_image_coordinates(
+                display_img,
+                key=f"cert_click_{selected_idx}",
+            )
+
+            # If user clicked, update position
+            if coords is not None:
+                click_x = coords["x"]
+                click_y = coords["y"]
+                new_hp = int((click_x / display_w) * 100)
+                new_vp = int((click_y / display_h) * 100)
+                if new_hp != st.session_state.get("prev_hp_val") or new_vp != st.session_state.get("prev_vp_val"):
+                    st.session_state["prev_hp_val"] = new_hp
+                    st.session_state["prev_vp_val"] = new_vp
+                    st.rerun()
+
         st.markdown(bdg(f"{svg('check')} Looks good", "ok"), unsafe_allow_html=True)
     except Exception as e:
         st.markdown(
@@ -486,7 +674,7 @@ def render_step_preview() -> None:
     if generated:
         st.markdown("---")
         st.markdown(f"**Generated Certificates ({len(generated)} total)**")
-        # Show in a grid of 3 columns
+        st.caption("Click 'Edit' on any certificate to adjust it above, then re-generate.")
         cols_per_row = 3
         for row_start in range(0, len(generated), cols_per_row):
             cols = st.columns(cols_per_row)
@@ -523,6 +711,14 @@ def render_step_preview() -> None:
                             ),
                             unsafe_allow_html=True,
                         )
+                    # Edit button to jump to this attendee in the editor
+                    if st.button(
+                        "✏️ Edit",
+                        key=f"edit_cert_{cert_idx}",
+                        use_container_width=True,
+                    ):
+                        st.session_state["preview_attendee_select"] = cert_idx
+                        st.rerun()
 
 
 def _generate_single_with_position(
@@ -571,11 +767,16 @@ def _generate_single_with_position(
 
 
 def _generate_preview_batch() -> None:
-    """Generate all certificates and store in session state for gallery display."""
+    """Generate all certificates using preview settings (font size + position)."""
     tb = st.session_state["template_bytes"]
     tf = st.session_state["template_format"]
     att: List[AttendeeRecord] = st.session_state["attendees"]
     overrides = st.session_state.get("name_overrides", {})
+
+    # Use preview step settings (not step 3 defaults)
+    preview_fs = st.session_state.get("prev_fs_val", st.session_state["font_size"])
+    preview_hp = st.session_state.get("prev_hp_val", 50)
+    preview_vp = st.session_state.get("prev_vp_val", st.session_state["vertical_position"])
 
     bar = st.progress(0)
     status = st.empty()
@@ -584,7 +785,7 @@ def _generate_preview_batch() -> None:
     try:
         fc = FontConfiguration(
             font_path=st.session_state["font_path"],
-            font_size=st.session_state["font_size"],
+            font_size=preview_fs,
             font_color=FontConfiguration.parse_color(st.session_state["font_color"]),
         )
         gen = CertificateGenerator(
@@ -595,22 +796,28 @@ def _generate_preview_batch() -> None:
         for i, a in enumerate(att):
             names.append(overrides.get(i, a.name))
 
-        batch = gen.generate_batch(
-            names,
-            vertical_position=st.session_state["vertical_position"],
-            vertical_as_percentage=True,
-        )
-        st.session_state["generated_certs"] = batch.certificates
-        st.session_state["zip_bytes"] = _make_zip(batch.certificates)
+        # Generate with horizontal + vertical position support
+        certificates: List[CertificateOutput] = []
+        errors: List = []
+        for i, name in enumerate(names):
+            try:
+                cert = _generate_single_with_position(
+                    gen, name, preview_hp, preview_vp
+                )
+                certificates.append(cert)
+            except Exception as e:
+                errors.append((name, str(e)))
+            if (i + 1) % max(1, len(names) // 20) == 0:
+                bar.progress((i + 1) / len(names))
+
+        st.session_state["generated_certs"] = certificates
+        st.session_state["zip_bytes"] = _make_zip(certificates)
         bar.progress(1.0)
-        status.text(f"Done — {len(batch.certificates)} certificates generated.")
-        if batch.errors:
-            for err in batch.errors:
+        status.text(f"Done — {len(certificates)} certificates generated.")
+        if errors:
+            for name, msg in errors:
                 st.markdown(
-                    bdg(
-                        f"{svg('x-circle')} {err.attendee_name}: {err.error_message}",
-                        "err",
-                    ),
+                    bdg(f"{svg('x-circle')} {name}: {msg}", "err"),
                     unsafe_allow_html=True,
                 )
     except Exception as e:
@@ -692,18 +899,33 @@ def _generate_only() -> None:
     tf = st.session_state["template_format"]
     att: List[AttendeeRecord] = st.session_state["attendees"]
     names = _get_final_names(att)
+
+    # Use preview settings
+    preview_fs = st.session_state.get("prev_fs_val", st.session_state["font_size"])
+    preview_hp = st.session_state.get("prev_hp_val", 50)
+    preview_vp = st.session_state.get("prev_vp_val", st.session_state["vertical_position"])
+
     bar = st.progress(0)
     status = st.empty()
     status.text("Generating...")
     try:
-        fc = FontConfiguration(font_path=st.session_state["font_path"], font_size=st.session_state["font_size"], font_color=FontConfiguration.parse_color(st.session_state["font_color"]))
+        fc = FontConfiguration(
+            font_path=st.session_state["font_path"],
+            font_size=preview_fs,
+            font_color=FontConfiguration.parse_color(st.session_state["font_color"]),
+        )
         gen = CertificateGenerator(template_bytes=tb, template_format=tf, font_config=fc)
-        batch = gen.generate_batch(names, vertical_position=st.session_state["vertical_position"], vertical_as_percentage=True)
-        st.session_state["generated_certs"] = batch.certificates
-        bar.progress(0.8)
-        st.session_state["zip_bytes"] = _make_zip(batch.certificates)
+        certificates: List[CertificateOutput] = []
+        for i, name in enumerate(names):
+            cert = _generate_single_with_position(gen, name, preview_hp, preview_vp)
+            certificates.append(cert)
+            if (i + 1) % max(1, len(names) // 10) == 0:
+                bar.progress((i + 1) / len(names) * 0.8)
+        st.session_state["generated_certs"] = certificates
+        bar.progress(0.9)
+        st.session_state["zip_bytes"] = _make_zip(certificates)
         bar.progress(1.0)
-        status.text(f"Done. {len(batch.certificates)} certificates ready.")
+        status.text(f"Done. {len(certificates)} certificates ready.")
     except Exception as e:
         st.error(f"Generation failed: {e}")
 
@@ -714,35 +936,72 @@ def _execute_send() -> None:
     tf = st.session_state["template_format"]
     att: List[AttendeeRecord] = st.session_state["attendees"]
     names = _get_final_names(att)
+
+    # Use preview settings
+    preview_fs = st.session_state.get("prev_fs_val", st.session_state["font_size"])
+    preview_hp = st.session_state.get("prev_hp_val", 50)
+    preview_vp = st.session_state.get("prev_vp_val", st.session_state["vertical_position"])
+
     bar = st.progress(0)
     status = st.empty()
     status.text(f"Generating {len(att)} certificates...")
     try:
-        fc = FontConfiguration(font_path=st.session_state["font_path"], font_size=st.session_state["font_size"], font_color=FontConfiguration.parse_color(st.session_state["font_color"]))
+        fc = FontConfiguration(
+            font_path=st.session_state["font_path"],
+            font_size=preview_fs,
+            font_color=FontConfiguration.parse_color(st.session_state["font_color"]),
+        )
         gen = CertificateGenerator(template_bytes=tb, template_format=tf, font_config=fc)
-        batch = gen.generate_batch(names, vertical_position=st.session_state["vertical_position"], vertical_as_percentage=True)
-        st.session_state["generated_certs"] = batch.certificates
+
+        # Generate with position support
+        certificates: List[CertificateOutput] = []
+        for i, name in enumerate(names):
+            cert = _generate_single_with_position(gen, name, preview_hp, preview_vp)
+            certificates.append(cert)
+            if (i + 1) % max(1, len(names) // 10) == 0:
+                bar.progress((i + 1) / len(names) * 0.3)
+
+        st.session_state["generated_certs"] = certificates
         bar.progress(0.3)
         status.text("Sending emails...")
         cert_bytes: List[bytes] = []
-        for cert in batch.certificates:
-            if cert.format in ("png","jpg"):
+        for cert in certificates:
+            if cert.format in ("png", "jpg"):
                 buf = io.BytesIO()
-                cert.certificate.save(buf, format="PNG" if cert.format == "png" else "JPEG")
+                if cert.format == "png":
+                    cert.certificate.save(buf, format="PNG", optimize=False)
+                else:
+                    rgb = cert.certificate.convert("RGB") if cert.certificate.mode == "RGBA" else cert.certificate
+                    rgb.save(buf, format="JPEG", quality=95, subsampling=0)
                 cert_bytes.append(buf.getvalue())
             else:
                 cert_bytes.append(cert.certificate)
-        # Match certificates to attendees by index (same order as names list)
-        ok_cert_names = {c.attendee_name for c in batch.certificates}
-        ok_att = [a for i, a in enumerate(att) if names[i] in ok_cert_names]
-        tmpl = EmailTemplate(subject=st.session_state["email_subject"], body="Hi {name},\n\n" + st.session_state["email_body"])
-        def prog(cur, tot):
-            bar.progress(0.3 + (cur/tot)*0.65)
+        # Match certificates to attendees by index (order-preserving)
+        ok_att = []
+        cert_idx = 0
+        for i, name in enumerate(names):
+            if cert_idx < len(certificates) and certificates[cert_idx].attendee_name == name:
+                ok_att.append(att[i])
+                cert_idx += 1
+        tmpl = EmailTemplate(
+            subject=st.session_state["email_subject"],
+            body="Hi {name},\n\n" + st.session_state["email_body"],
+        )
+
+        def prog(cur: int, tot: int) -> None:
+            bar.progress(0.3 + (cur / tot) * 0.65)
             status.text(f"Sending {cur}/{tot}...")
+
         sender = EmailSender()
-        result = sender.send_bulk(recipients=ok_att, certificate_data=cert_bytes, certificate_format=tf, template=tmpl, progress_callback=prog)
+        result = sender.send_bulk(
+            recipients=ok_att,
+            certificate_data=cert_bytes,
+            certificate_format=tf,
+            template=tmpl,
+            progress_callback=prog,
+        )
         st.session_state["send_results"] = result
-        st.session_state["zip_bytes"] = _make_zip(batch.certificates)
+        st.session_state["zip_bytes"] = _make_zip(certificates)
         bar.progress(1.0)
         status.text("Complete.")
     except Exception as e:
@@ -783,7 +1042,11 @@ def _make_zip(certs: List[CertificateOutput]) -> bytes:
             fn = f"{name}.{cert.format}"
             if cert.format in ("png","jpg"):
                 ib = io.BytesIO()
-                cert.certificate.save(ib, format="PNG" if cert.format == "png" else "JPEG")
+                if cert.format == "png":
+                    cert.certificate.save(ib, format="PNG", optimize=False)
+                else:
+                    rgb = cert.certificate.convert("RGB") if cert.certificate.mode == "RGBA" else cert.certificate
+                    rgb.save(ib, format="JPEG", quality=95, subsampling=0)
                 zf.writestr(fn, ib.getvalue())
             else:
                 zf.writestr(fn, cert.certificate)

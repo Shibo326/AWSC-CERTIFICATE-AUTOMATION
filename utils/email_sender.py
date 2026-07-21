@@ -3,6 +3,7 @@
 import logging
 import os
 import smtplib
+import time
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
@@ -243,6 +244,13 @@ class EmailSender:
         total = len(recipients)
         result = SendResult()
 
+        # Validate inputs
+        if len(certificate_data) != total:
+            raise ValueError(
+                f"recipients ({total}) and certificate_data ({len(certificate_data)}) "
+                f"must have the same length"
+            )
+
         if total > GMAIL_DAILY_LIMIT_WARNING:
             logger.warning(
                 f"Batch size ({total}) exceeds {GMAIL_DAILY_LIMIT_WARNING}. "
@@ -291,6 +299,39 @@ class EmailSender:
                     msg.as_string(),
                 )
                 result.successful.append(recipient.email)
+
+            except smtplib.SMTPDataError as e:
+                # Rate limit or data rejection from Gmail
+                error_code = e.smtp_code
+                if error_code in (421, 450, 452):
+                    logger.error(f"Gmail rate limit at email {current}/{total}: {e}")
+                    result.failures.append(
+                        DeliveryFailure(
+                            email=recipient.email,
+                            attendee_name=recipient.name,
+                            error_message=f"Rate limited by Gmail (code {error_code})",
+                        )
+                    )
+                    for j in range(i + 1, total):
+                        remaining = recipients[j]
+                        result.failures.append(
+                            DeliveryFailure(
+                                email=remaining.email,
+                                attendee_name=remaining.name,
+                                error_message="Batch stopped due to Gmail rate limit",
+                            )
+                        )
+                    if progress_callback:
+                        progress_callback(total, total)
+                    break
+                else:
+                    result.failures.append(
+                        DeliveryFailure(
+                            email=recipient.email,
+                            attendee_name=recipient.name,
+                            error_message=f"SMTP data error ({error_code}): {e}",
+                        )
+                    )
 
             except smtplib.SMTPRecipientsRefused as e:
                 result.failures.append(
@@ -365,6 +406,10 @@ class EmailSender:
 
             if progress_callback:
                 progress_callback(current, total)
+
+            # Rate limiting: small delay between sends to avoid Gmail throttling
+            if current < total:
+                time.sleep(0.5)
 
         self.disconnect()
         return result
