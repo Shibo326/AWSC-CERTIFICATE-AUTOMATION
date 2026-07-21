@@ -1,9 +1,9 @@
-﻿[theme]
-primaryColor = "#6366f1"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f8fafc"
-textColor = "#1e293b"
-font = "sans serif"
+[theme]
+primaryColor = '#6366f1'
+backgroundColor = '#ffffff'
+secondaryBackgroundColor = '#f8fafc'
+textColor = '#1e293b'
+font = 'sans serif'
 
 [server]
 headless = true
@@ -13,4 +13,4 @@ gatherUsageStats = false
 
 [client]
 showSidebarNavigation = false
-toolbarMode = "minimal"
+toolbarMode = 'minimal'
