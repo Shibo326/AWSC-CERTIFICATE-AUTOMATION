@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  CertFlow iOS Info.plist Additions
+  ==================================
+  These keys should be merged into the auto-generated Info.plist during the
+  flet build ipa process. Flet/Flutter generates a base Info.plist; these entries
+  document additional configuration required for CertFlow.
+
+  How to apply:
+    After running `flet build ipa`, the generated Xcode project will be in
+    build/ipa/. You can either:
+    1. Use Flet's --info-plist flag (if supported) to merge these entries
+    2. Manually add these keys to the generated ios/Runner/Info.plist before
+       archiving in Xcode
+-->
+<plist version="1.0">
+<dict>
+    <!-- Bundle Configuration -->
+    <key>CFBundleIdentifier</key>
+    <string>com.certflow.app</string>
+
+    <key>CFBundleDisplayName</key>
+    <string>CertFlow</string>
+
+    <key>CFBundleName</key>
+    <string>CertFlow</string>
+
+    <key>CFBundleShortVersionString</key>
+    <string>2.0.0</string>
+
+    <key>CFBundleVersion</key>
+    <string>1</string>
+
+    <key>MinimumOSVersion</key>
+    <string>16.0</string>
+
+    <!-- Network Access (required for email sending via SMTP) -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <!-- Allow outbound connections to smtp.gmail.com:587 (TLS) -->
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>smtp.gmail.com</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <false/>
+                <key>NSExceptionMinimumTLSVersion</key>
+                <string>TLSv1.2</string>
+                <key>NSIncludesSubdomains</key>
+                <false/>
+            </dict>
+        </dict>
+    </dict>
+
+    <!-- Document Types - Supported file imports -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <!-- Certificate Templates -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Certificate Template</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.png</string>
+                <string>public.jpeg</string>
+                <string>com.adobe.pdf</string>
+            </array>
+        </dict>
+        <!-- Attendee Lists -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Attendee List</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.comma-separated-values-text</string>
+                <string>org.openxmlformats.spreadsheetml.sheet</string>
+            </array>
+        </dict>
+    </array>
+
+    <!-- Imported UTI declarations for XLSX if needed -->
+    <key>UTImportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeDescription</key>
+            <string>Excel Spreadsheet (XLSX)</string>
+            <key>UTTypeIdentifier</key>
+            <string>org.openxmlformats.spreadsheetml.sheet</string>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>xlsx</string>
+                </array>
+                <key>public.mime-type</key>
+                <string>application/vnd.openxmlformats-officedocument.spreadsheetml.sheet</string>
+            </dict>
+        </dict>
+    </array>
+
+    <!-- File sharing - allow Files app access to app documents -->
+    <key>UIFileSharingEnabled</key>
+    <true/>
+    <key>LSSupportsOpeningDocumentsInPlace</key>
+    <true/>
+
+    <!-- Supported interface orientations -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+</dict>
+</plist>

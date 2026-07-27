@@ -3,10 +3,12 @@
 credentials.toml
 *.env
 .env
+.certflow/
 
 # Python
 __pycache__/
 *.py[cod]
+*.pyc
 *$py.class
 *.so
 .Python
@@ -23,8 +25,15 @@ htmlcov/
 # Generated
 generated_certs/
 *.zip
+
+# Build output
 build/
 dist/
+build_assets/
+*.exe
+*.apk
+*.ipa
+*.app
 
 # IDE
 .vscode/

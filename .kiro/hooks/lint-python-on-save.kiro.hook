@@ -11,6 +11,6 @@
   },
   "then": {
     "type": "runCommand",
-    "command": "python -m ruff check --fix"
+    "command": "py -m ruff check --fix"
   }
 }

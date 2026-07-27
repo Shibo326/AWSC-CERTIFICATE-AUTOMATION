@@ -5,11 +5,44 @@ description = "AWSC GLOBAL PROJECT - Automated Certificate Generator and Deliver
 requires-python = ">=3.11"
 
 [tool.flet]
+app = "main.py"
 module = "main"
 name = "CertFlow"
-assets = ["assets"]
 product = "CertFlow"
 org = "com.certflow"
+company = "CertFlow"
+description = "Bulk Certificate Generator and Email Sender"
+assets = "assets"
+icon = "assets/icon.png"
+dependencies = [
+    "flet>=0.25.0",
+    "flet-secure-storage>=0.25.0",
+    "Pillow>=11.0.0",
+    "PyMuPDF>=1.24.9",
+    "reportlab>=4.2.2",
+    "openpyxl>=3.1.5",
+]
+
+[tool.flet.android]
+# Package name: com.certflow.app (org "com.certflow" + project "app")
+package_name = "com.certflow.app"
+min_sdk = 24
+target_sdk = 34
+permissions = [
+    "INTERNET",
+    "READ_EXTERNAL_STORAGE",
+    "POST_NOTIFICATIONS",
+]
+
+[tool.flet.ios]
+bundle_id = "com.certflow.app"
+min_ios_version = "16.0"
+
+# macOS-specific build configuration
+[tool.flet.macos]
+bundle_id = "com.certflow.app"
+min_os_version = "12.0"
+entitlements = "macos/CertFlow.entitlements"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

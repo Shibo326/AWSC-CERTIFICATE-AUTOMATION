@@ -11,6 +11,6 @@
   },
   "then": {
     "type": "runCommand",
-    "command": "python -m mypy utils/ --ignore-missing-imports --no-error-summary"
+    "command": "py -m mypy utils/ --ignore-missing-imports --no-error-summary"
   }
 }

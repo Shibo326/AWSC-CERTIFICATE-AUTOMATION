@@ -1,6 +1,7 @@
 """Unit tests for EmailSender with mocked SMTP."""
 
 from unittest.mock import MagicMock, patch
+from pathlib import Path
 import smtplib
 
 import pytest
@@ -52,10 +53,17 @@ def mock_cert_data():
 class TestEmailSenderCredentials:
     """Tests for credential loading."""
 
-    def test_check_credentials_returns_false_when_missing(self):
-        with patch.dict("os.environ", {}, clear=True):
-            result = EmailSender.check_credentials()
-            assert result is False
+    def test_check_credentials_returns_false_when_missing(self, tmp_path):
+        with patch.dict(
+            "os.environ",
+            {"CERTFLOW_EMAIL_SENDER": "", "CERTFLOW_EMAIL_APP_PASSWORD": ""},
+        ):
+            with patch.object(
+                EmailSender, "_load_from_toml", return_value=None
+            ):
+                with patch("pathlib.Path.home", return_value=tmp_path):
+                    result = EmailSender.check_credentials()
+                    assert result is False
 
     def test_check_credentials_returns_true_with_env_vars(self):
         env = {
@@ -63,15 +71,83 @@ class TestEmailSenderCredentials:
             "CERTFLOW_EMAIL_APP_PASSWORD": "test-password",
         }
         with patch.dict("os.environ", env):
-            sender = EmailSender()
-            creds = sender.load_credentials()
-            assert creds.sender_email == "test@example.com"
+            with patch.object(
+                EmailSender, "_load_from_toml", return_value=None
+            ):
+                sender = EmailSender()
+                creds = sender.load_credentials()
+                assert creds.sender_email == "test@example.com"
+                assert creds.app_password == "test-password"
 
-    def test_load_credentials_raises_when_missing(self):
-        with patch.dict("os.environ", {}, clear=True):
+    def test_load_credentials_raises_when_missing(self, tmp_path):
+        with patch.dict(
+            "os.environ",
+            {"CERTFLOW_EMAIL_SENDER": "", "CERTFLOW_EMAIL_APP_PASSWORD": ""},
+        ):
+            with patch("pathlib.Path.home", return_value=tmp_path):
+                with patch.object(
+                    EmailSender, "_load_from_toml", return_value=None
+                ):
+                    sender = EmailSender()
+                    with pytest.raises(ConfigurationError):
+                        sender.load_credentials()
+
+    def test_load_credentials_from_app_directory_toml(self, tmp_path):
+        """Credentials found in app-directory credentials.toml."""
+        cred_file = tmp_path / "credentials.toml"
+        cred_file.write_text(
+            '[email]\nsender = "app@example.com"\n'
+            'app_password = "apppassword12345"\n'
+        )
+        sender = EmailSender()
+        creds = sender._load_from_toml(cred_file)
+        assert creds is not None
+        assert creds.sender_email == "app@example.com"
+        assert creds.app_password == "apppassword12345"
+
+    def test_load_credentials_from_home_directory_toml(self, tmp_path):
+        """Credentials found in ~/.certflow/credentials.toml."""
+        certflow_dir = tmp_path / ".certflow"
+        certflow_dir.mkdir()
+        cred_file = certflow_dir / "credentials.toml"
+        cred_file.write_text(
+            '[email]\nsender = "home@example.com"\n'
+            'app_password = "homepassword1234"\n'
+        )
+        sender = EmailSender()
+        creds = sender._load_from_toml(cred_file)
+        assert creds is not None
+        assert creds.sender_email == "home@example.com"
+        assert creds.app_password == "homepassword1234"
+
+    def test_load_from_toml_returns_none_when_file_missing(self, tmp_path):
+        """Returns None when the TOML file does not exist."""
+        missing = tmp_path / "nonexistent.toml"
+        result = EmailSender._load_from_toml(missing)
+        assert result is None
+
+    def test_load_from_toml_returns_none_for_empty_fields(self, tmp_path):
+        """Returns None when email section exists but fields are empty."""
+        cred_file = tmp_path / "credentials.toml"
+        cred_file.write_text('[email]\nsender = ""\napp_password = ""\n')
+        result = EmailSender._load_from_toml(cred_file)
+        assert result is None
+
+    def test_credential_fallback_order(self, tmp_path):
+        """App directory credentials.toml takes precedence over env vars."""
+        cred_file = tmp_path / "credentials.toml"
+        cred_file.write_text(
+            '[email]\nsender = "file@example.com"\n'
+            'app_password = "filepassword1234"\n'
+        )
+        env = {
+            "CERTFLOW_EMAIL_SENDER": "env@example.com",
+            "CERTFLOW_EMAIL_APP_PASSWORD": "envpassword12345",
+        }
+        with patch.dict("os.environ", env):
             sender = EmailSender()
-            with pytest.raises(ConfigurationError):
-                sender.load_credentials()
+            creds = sender._load_from_toml(cred_file)
+            assert creds.sender_email == "file@example.com"
 
 
 class TestEmailSenderConnection:

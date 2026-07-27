@@ -45,56 +45,45 @@ class EmailSender:
         self._smtp: Optional[smtplib.SMTP] = None
 
     def load_credentials(self) -> GmailCredentials:
-        """Load Gmail credentials from config file, secrets.toml, or env vars.
+        """Load Gmail credentials using a platform-agnostic fallback chain.
 
         Precedence:
-            1. .streamlit/secrets.toml (Streamlit Cloud compatible)
-            2. credentials.toml in app directory (desktop/mobile)
-            3. Environment variables (CERTFLOW_EMAIL_SENDER, CERTFLOW_EMAIL_APP_PASSWORD)
+            1. credentials.toml in app directory
+            2. ~/.certflow/credentials.toml
+            3. Environment variables (CERTFLOW_EMAIL_SENDER,
+               CERTFLOW_EMAIL_APP_PASSWORD)
 
         Returns:
             GmailCredentials with sender email and app password.
 
         Raises:
-            ConfigurationError: If no valid credentials found in any source.
+            ConfigurationError: If no valid credentials found in any source,
+                listing all checked locations.
         """
-        # Try .streamlit/secrets.toml first (Streamlit compatibility)
-        try:
-            import streamlit as st
-            secrets = st.secrets.get("email", {})
-            sender = secrets.get("sender", "")
-            app_password = secrets.get("app_password", "")
-            if sender and app_password:
-                return GmailCredentials(
-                    sender_email=sender, app_password=app_password
-                )
-        except Exception:
-            pass
+        checked_sources: List[str] = []
 
-        # Try local credentials.toml (for desktop/mobile builds)
-        try:
-            import tomllib
-            cred_paths = [
-                Path("credentials.toml"),
-                Path.home() / ".certflow" / "credentials.toml",
-            ]
-            for cred_path in cred_paths:
-                if cred_path.exists():
-                    with open(cred_path, "rb") as f:
-                        config = tomllib.load(f)
-                    email_config = config.get("email", {})
-                    sender = email_config.get("sender", "")
-                    app_password = email_config.get("app_password", "")
-                    if sender and app_password:
-                        return GmailCredentials(
-                            sender_email=sender, app_password=app_password
-                        )
-        except Exception:
-            pass
+        # 1. credentials.toml in app directory
+        app_cred_path = Path("credentials.toml")
+        checked_sources.append(str(app_cred_path.resolve()))
+        creds = self._load_from_toml(app_cred_path)
+        if creds is not None:
+            return creds
 
-        # Fallback to environment variables
-        sender = os.environ.get("CERTFLOW_EMAIL_SENDER", "")
-        app_password = os.environ.get("CERTFLOW_EMAIL_APP_PASSWORD", "")
+        # 2. ~/.certflow/credentials.toml
+        home_cred_path = Path.home() / ".certflow" / "credentials.toml"
+        checked_sources.append(str(home_cred_path))
+        creds = self._load_from_toml(home_cred_path)
+        if creds is not None:
+            return creds
+
+        # 3. Environment variables
+        env_sender_key = "CERTFLOW_EMAIL_SENDER"
+        env_password_key = "CERTFLOW_EMAIL_APP_PASSWORD"
+        checked_sources.append(
+            f"environment variables {env_sender_key} / {env_password_key}"
+        )
+        sender = os.environ.get(env_sender_key, "")
+        app_password = os.environ.get(env_password_key, "")
 
         if sender and app_password:
             return GmailCredentials(
@@ -102,11 +91,42 @@ class EmailSender:
             )
 
         raise ConfigurationError(
-            "Gmail credentials not found. Checked: "
-            ".streamlit/secrets.toml, credentials.toml, "
-            "~/.certflow/credentials.toml, and environment variables "
-            "CERTFLOW_EMAIL_SENDER / CERTFLOW_EMAIL_APP_PASSWORD"
+            "Gmail credentials not found. Checked sources:\n"
+            + "\n".join(f"  - {source}" for source in checked_sources)
         )
+
+    @staticmethod
+    def _load_from_toml(path: Path) -> Optional[GmailCredentials]:
+        """Attempt to load credentials from a TOML file.
+
+        Args:
+            path: Path to the credentials.toml file.
+
+        Returns:
+            GmailCredentials if valid credentials found, None otherwise.
+        """
+        if not path.exists():
+            return None
+
+        try:
+            import tomllib
+        except ModuleNotFoundError:
+            import tomli as tomllib  # type: ignore[no-redef]
+
+        try:
+            with open(path, "rb") as f:
+                config = tomllib.load(f)
+            email_config = config.get("email", {})
+            sender = email_config.get("sender", "")
+            app_password = email_config.get("app_password", "")
+            if sender and app_password:
+                return GmailCredentials(
+                    sender_email=sender, app_password=app_password
+                )
+        except (OSError, ValueError, KeyError) as e:
+            logger.warning("Failed to parse credentials from %s: %s", path, e)
+
+        return None
 
     @staticmethod
     def check_credentials() -> bool:

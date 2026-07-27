@@ -8,6 +8,6 @@
   },
   "then": {
     "type": "runCommand",
-    "command": "python -m pytest tests/ --tb=short -q"
+    "command": "py -m pytest tests/ --tb=short -q"
   }
 }

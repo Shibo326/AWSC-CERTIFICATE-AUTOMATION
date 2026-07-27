@@ -12,6 +12,6 @@
   },
   "then": {
     "type": "runCommand",
-    "command": "python -m pytest tests/ -x --tb=short -q"
+    "command": "py -m pytest tests/ -x --tb=short -q"
   }
 }

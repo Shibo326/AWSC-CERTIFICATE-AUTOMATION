@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Allow outbound network connections (required for SMTP email sending) -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+
+    <!-- Allow user-selected file read access (for loading templates and attendee lists via file picker) -->
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+
+    <!-- App Sandbox enabled (required for Mac App Store and notarization) -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+</dict>
+</plist>

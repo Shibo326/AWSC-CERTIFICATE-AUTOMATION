@@ -80,16 +80,16 @@ class TestImageProcessorRendering:
         self, sample_png_template, default_font_config
     ):
         processor = ImageProcessor(sample_png_template, default_font_config)
-        original_data = list(sample_png_template.getdata())
+        original_data = list(sample_png_template.tobytes())
         processor.render_name("Test Name")
-        after_data = list(sample_png_template.getdata())
+        after_data = list(sample_png_template.tobytes())
         assert original_data == after_data
 
     def test_render_changes_pixels(self, sample_png_template, default_font_config):
         processor = ImageProcessor(sample_png_template, default_font_config)
         result = processor.render_name("Test Name")
-        result_data = list(result.getdata())
-        template_data = list(sample_png_template.getdata())
+        result_data = list(result.tobytes())
+        template_data = list(sample_png_template.tobytes())
         assert result_data != template_data
 
     def test_render_with_custom_color(self, sample_png_template):
@@ -102,4 +102,4 @@ class TestImageProcessorRendering:
         processor = ImageProcessor(sample_png_template, default_font_config)
         result1 = processor.render_name("Same Name")
         result2 = processor.render_name("Same Name")
-        assert list(result1.getdata()) == list(result2.getdata())
+        assert list(result1.tobytes()) == list(result2.tobytes())

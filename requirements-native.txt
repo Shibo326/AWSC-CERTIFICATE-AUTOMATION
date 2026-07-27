@@ -1,0 +1,11 @@
+# Native build dependencies for CertFlow (Flet)
+# Used with: flet build windows/macos/apk/ipa
+# NOTE: This file deliberately excludes Streamlit and streamlit-image-coordinates
+# which are only needed for the web frontend (requirements.txt).
+
+flet>=0.25.0
+flet-secure-storage>=0.25.0
+Pillow>=11.0.0
+PyMuPDF>=1.24.9
+reportlab>=4.2.2
+openpyxl>=3.1.5
