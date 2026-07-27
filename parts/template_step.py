@@ -69,7 +69,8 @@ class TemplateStep:
             visible=False,
         )
 
-        self._file_picker = ft.FilePicker(on_result=self._on_file_picked)
+        self._file_picker = ft.FilePicker()
+        self._file_picker.on_result = self._on_file_picked
 
         self._upload_button = ft.ElevatedButton(
             "Choose Template",

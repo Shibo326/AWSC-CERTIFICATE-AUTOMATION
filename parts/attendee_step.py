@@ -44,7 +44,8 @@ class AttendeeStep:
         )
         self._error_container = ft.Column(visible=False, spacing=4)
         self._attendee_count_text = ft.Text("", size=14, visible=False)
-        self._file_picker = ft.FilePicker(on_result=self._on_file_picked)
+        self._file_picker = ft.FilePicker()
+        self._file_picker.on_result = self._on_file_picked
 
     def build(self) -> ft.Control:
         """Build the attendee upload UI component."""

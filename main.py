@@ -218,7 +218,7 @@ def main(page: ft.Page) -> None:
                                     if i == current_step_index
                                     else ft.Colors.GREY_400
                                 ),
-                                foreground_color=ft.Colors.WHITE,
+                                color=ft.Colors.WHITE,
                             ),
                             ft.Text(
                                 label,
@@ -359,13 +359,19 @@ def main(page: ft.Page) -> None:
     # AppBar with gear icon and queue status badge
     # ------------------------------------------------------------------
     queue_badge = ft.Badge(
-        content=ft.Icon(ft.Icons.OUTBOX, color=ft.Colors.WHITE, size=20),
         text="0",
         small_size=10,
     )
 
+    queue_badge_icon = ft.Icon(
+        ft.Icons.OUTBOX,
+        color=ft.Colors.WHITE,
+        size=20,
+        badge=queue_badge,
+    )
+
     queue_badge_container = ft.Container(
-        content=queue_badge,
+        content=queue_badge_icon,
         visible=False,
         tooltip="Emails in queue",
         on_click=lambda e: _show_queue_panel(),

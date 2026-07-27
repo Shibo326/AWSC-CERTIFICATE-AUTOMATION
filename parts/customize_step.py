@@ -291,9 +291,8 @@ class CustomizeStep:
         )
 
         # Font import file picker
-        self._font_picker = ft.FilePicker(
-            on_result=self._on_import_font_result,
-        )
+        self._font_picker = ft.FilePicker()
+        self._font_picker.on_result = self._on_import_font_result
 
         # Import status message
         self._import_status = ft.Text("", size=11, visible=False)
