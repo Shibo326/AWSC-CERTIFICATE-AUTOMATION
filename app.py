@@ -169,8 +169,10 @@ st.markdown("""
     /* Sidebar styling */
     [data-testid="stSidebar"] {
         padding-top: 1rem;
-        min-width: 280px;
-        width: 300px;
+    }
+    [data-testid="stSidebar"][aria-expanded="false"] {
+        min-width: 0 !important;
+        width: 0 !important;
     }
     [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
         word-wrap: break-word;
