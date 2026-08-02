@@ -458,7 +458,7 @@ if logo_path.exists():
     logo_b64 = base64.b64encode(logo_path.read_bytes()).decode()
     st.markdown(
         f'<div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;">'
-        f'<img src="data:image/png;base64,{logo_b64}" height="80" style="border-radius:8px;">'
+        f'<img src="data:image/png;base64,{logo_b64}" width="100" height="100">'
         f'<div>'
         f'<h1 style="margin:0;font-size:2.2rem;">CertFlow</h1>'
         f'<p style="margin:0;color:#64748b;font-size:0.9rem;">Automated Certificate Generator</p>'
