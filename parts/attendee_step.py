@@ -49,8 +49,8 @@ class AttendeeStep:
 
     def build(self) -> ft.Control:
         """Build the attendee upload UI component."""
-        if self._file_picker not in self.page.overlay:
-            self.page.overlay.append(self._file_picker)
+        if self._file_picker not in self.page.services:
+            self.page.services.append(self._file_picker)
 
         return ft.Column(
             controls=[
@@ -75,9 +75,9 @@ class AttendeeStep:
             spacing=12,
         )
 
-    def _pick_file(self, e: ft.ControlEvent) -> None:
+    async def _pick_file(self, e: ft.ControlEvent) -> None:
         """Launch the file picker dialog filtered to CSV/XLSX."""
-        self._file_picker.pick_files(
+        await self._file_picker.pick_files(
             allowed_extensions=ALLOWED_EXTENSIONS,
             dialog_title="Select Attendee File (CSV or XLSX)",
         )

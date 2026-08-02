@@ -63,10 +63,10 @@ class ReviewStep:
         """
         # Certificate preview image (base64-encoded)
         self._preview_image = ft.Image(
-            src_base64="",
+            src="",
             width=500,
             height=350,
-            fit=ft.ImageFit.CONTAIN,
+            fit=ft.BoxFit.CONTAIN,
             visible=False,
         )
 
@@ -263,7 +263,7 @@ class ReviewStep:
                 img.save(buffer, format=save_format)
                 img_bytes = buffer.getvalue()
                 encoded = base64.b64encode(img_bytes).decode("ascii")
-                self._preview_image.src_base64 = encoded
+                self._preview_image.src = encoded
 
             elif cert.format == "pdf":
                 # cert.certificate is PDF bytes — render first page
@@ -272,22 +272,22 @@ class ReviewStep:
 
                     doc = fitz.open(stream=cert.certificate, filetype="pdf")
                     if doc.page_count > 0:
-                        page = doc.load_page(0)
-                        pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+                        pdf_page = doc.load_page(0)
+                        pix = pdf_page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
                         png_bytes = pix.tobytes("png")
                         encoded = base64.b64encode(png_bytes).decode("ascii")
-                        self._preview_image.src_base64 = encoded
+                        self._preview_image.src = encoded
                     doc.close()
                 except ImportError:
                     logger.warning("PyMuPDF not available for PDF preview.")
-                    self._preview_image.src_base64 = ""
+                    self._preview_image.src = ""
                 except Exception as exc:
                     logger.warning("PDF preview failed: %s", exc)
-                    self._preview_image.src_base64 = ""
+                    self._preview_image.src = ""
 
         except Exception as exc:
             logger.warning("Certificate preview failed: %s", exc)
-            self._preview_image.src_base64 = ""
+            self._preview_image.src = ""
 
     def _on_prev(self, e: ft.ControlEvent) -> None:
         """Navigate to the previous certificate."""
@@ -389,7 +389,7 @@ class ReviewStep:
         self._vertical_position = 50
 
         if self._preview_image:
-            self._preview_image.src_base64 = ""
+            self._preview_image.src = ""
             self._preview_image.visible = False
         if self._empty_text:
             self._empty_text.visible = True

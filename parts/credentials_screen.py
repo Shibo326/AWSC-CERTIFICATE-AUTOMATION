@@ -165,7 +165,7 @@ class CredentialsScreen:
                 weight=ft.FontWeight.W_500,
                 color=ft.Colors.BLUE_700,
             ),
-            initially_expanded=False,
+            expanded=False,
             controls=[
                 ft.Container(
                     padding=ft.Padding(left=16, top=8, right=16, bottom=12),

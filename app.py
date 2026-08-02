@@ -1,8 +1,10 @@
 """CertFlow — Automated Certificate Generator and Email Sender."""
 
+import base64
 import io
 import re
 import zipfile
+from pathlib import Path
 from typing import List, Optional
 
 import fitz
@@ -340,11 +342,8 @@ def _do_send_emails() -> None:
 def _render_sidebar() -> None:
     """Render the sidebar with app info and status."""
     with st.sidebar:
-        st.markdown(
-            f'{_icon("school", 24)} **CertFlow**',
-            unsafe_allow_html=True,
-        )
-        st.caption(f"v{APP_VERSION}")
+        st.markdown("**CertFlow**")
+        st.caption("Property of AWSSB Global City")
         st.markdown("---")
 
         st.markdown("### Status")
@@ -445,16 +444,24 @@ _render_sidebar()
 
 # --- Main Content -----------------------------------------------------------
 
-st.markdown(
-    f'# {_icon("school", 28)} CertFlow',
-    unsafe_allow_html=True,
-)
+logo_path = Path("image/NEW_AWSLC_LOGO-removebg-preview.png")
+if logo_path.exists():
+    logo_b64 = base64.b64encode(logo_path.read_bytes()).decode()
+    st.markdown(
+        f'<div style="display:flex;align-items:center;gap:12px;">'
+        f'<img src="data:image/png;base64,{logo_b64}" height="50">'
+        f'<h1 style="margin:0;">CertFlow</h1>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown("# CertFlow", unsafe_allow_html=True)
 st.markdown(
     "Generate personalized certificates in bulk and send them via email — "
     "all from one place."
 )
 
-with st.expander("🆕 First time here? Here's how it works", expanded=False):
+with st.expander("First time here? Here's how it works", expanded=False):
     st.markdown(
         "CertFlow takes your certificate design and a list of attendees, "
         "then automatically puts each person's name on their certificate "
@@ -464,19 +471,19 @@ with st.expander("🆕 First time here? Here's how it works", expanded=False):
         "3. **Customize** — pick the font, size, color, and position\n"
         "4. **Generate** — CertFlow creates one certificate per person\n"
         "5. **Send** — emails go out with certificates attached\n\n"
-        "💡 You can also just download the certificates as a ZIP "
+        "You can also just download the certificates as a ZIP "
         "without sending emails."
     )
 
-st.markdown("---")
+st.divider()
 
 
 # --- Step 1: Upload Template ------------------------------------------------
 
-st.header("Step 1: Upload Certificate Template")
+st.markdown(f'## {_icon("upload_file")} Step 1: Upload Template', unsafe_allow_html=True)
 st.caption(
-    "This is the background image for your certificates. "
-    "Upload a blank certificate design — names will be added automatically."
+    "Upload your certificate template image. "
+    "This will be the background for every certificate."
 )
 
 uploaded_template = st.file_uploader(
@@ -489,6 +496,7 @@ uploaded_template = st.file_uploader(
     ),
     key="template_uploader",
 )
+st.caption("Supported: PNG, JPG, PDF (max 10MB)")
 
 if uploaded_template is not None:
     if uploaded_template.size > MAX_TEMPLATE_SIZE_MB * 1024 * 1024:
@@ -533,16 +541,34 @@ if uploaded_template is not None:
             doc.close()
             uploaded_template.seek(0)
 
-st.markdown("---")
+st.divider()
 
 
 # --- Step 2: Upload Attendees -----------------------------------------------
 
-st.header("Step 2: Upload Attendee List")
+st.markdown(f'## {_icon("group")} Step 2: Upload Attendee List', unsafe_allow_html=True)
 st.caption(
     "Upload a spreadsheet with your attendees' names and email addresses. "
     "CertFlow will create one certificate per person."
 )
+
+with st.expander("Required file format", expanded=False):
+    st.markdown(
+        "Your CSV or Excel file **must** have a header row with these exact column names:\n\n"
+        "| name | email |\n"
+        "|------|-------|\n"
+        "| Juan Dela Cruz | juan@gmail.com |\n"
+        "| Maria Santos | maria@gmail.com |\n\n"
+        "**Rules:**\n"
+        "- Column headers must be exactly `name` and `email` (case doesn't matter)\n"
+        "- Each row = one attendee who will receive a certificate\n"
+        "- Duplicates are automatically removed (first occurrence is kept)\n"
+        "- Accepted formats: `.csv` or `.xlsx`\n"
+        "- Max file size: 5MB\n\n"
+        "**Tip:** Create your list in any spreadsheet app (Excel, Google Sheets, "
+        "LibreOffice, WPS Office) — just use `name` and `email` as column headers. "
+        "Save as .csv or .xlsx to upload."
+    )
 
 if st.session_state["template_file"] is None:
     st.info("Upload a certificate template first (Step 1).")
@@ -552,11 +578,12 @@ else:
         type=["csv", "xlsx"],
         help=(
             "Your file needs at least two columns: 'name' and 'email'. "
-            "You can create this in Google Sheets or Excel — just save/export "
-            "as CSV. Max size: 5MB."
+            "You can create this in Excel, Google Sheets, or LibreOffice — "
+            "just save/export as CSV or XLSX. Max size: 5MB."
         ),
         key="csv_uploader",
     )
+    st.caption("Supported: CSV, XLSX from Excel/Google Sheets/LibreOffice (max 5MB)")
 
     if uploaded_csv is not None:
         if uploaded_csv.size > MAX_CSV_SIZE_MB * 1024 * 1024:
@@ -577,7 +604,7 @@ else:
                 if result.records:
                     st.success(
                         f"Loaded **{len(result.records)}** attendees "
-                        f"from **{uploaded_csv.name}**"
+                        f"from **{uploaded_csv.name}** successfully."
                     )
 
                     with st.expander(
@@ -605,15 +632,15 @@ else:
             except ValueError as e:
                 st.error(f"{e}")
 
-st.markdown("---")
+st.divider()
 
 
 # --- Step 3: Customize -----------------------------------------------------
 
-st.header("Step 3: Customize Certificate")
+st.markdown(f'## {_icon("palette")} Step 3: Customize Certificate', unsafe_allow_html=True)
 st.caption(
-    "Adjust how the attendee's name looks on the certificate. "
-    "Use the live preview below to get it just right."
+    "Fine-tune how each attendee's name appears on the certificate. "
+    "Changes are reflected in the live preview below."
 )
 
 if not st.session_state["attendees"]:
@@ -636,6 +663,7 @@ else:
             max_value=120,
             value=st.session_state["font_size"],
             step=2,
+            key="font_size_slider",
         )
         st.session_state["font_size"] = font_size
 
@@ -652,6 +680,7 @@ else:
         max_value=100,
         value=st.session_state["vertical_position"],
         help="0% = top, 50% = center, 100% = bottom",
+        key="vertical_position_slider",
     )
     st.session_state["vertical_position"] = vertical_position
 
@@ -692,11 +721,14 @@ else:
             )
 
             if isinstance(preview_cert.certificate, Image.Image):
-                st.image(
-                    preview_cert.certificate,
-                    caption=f"Preview: {preview_name}",
-                    use_container_width=True,
-                )
+                # Show full-res image with use_container_width for responsive sizing
+                # Streamlit's built-in fullscreen button will show it at full resolution
+                with st.container(border=True):
+                    st.image(
+                        preview_cert.certificate,
+                        caption=f"Preview: {preview_name}",
+                        use_container_width=True,
+                    )
             else:
                 doc = fitz.open(
                     stream=preview_cert.certificate, filetype="pdf"
@@ -706,11 +738,12 @@ else:
                 img = Image.frombytes(
                     "RGB", [pix.width, pix.height], pix.samples
                 )
-                st.image(
-                    img,
-                    caption=f"Preview: {preview_name}",
-                    use_container_width=True,
-                )
+                with st.container(border=True):
+                    st.image(
+                        img,
+                        caption=f"Preview: {preview_name}",
+                        use_container_width=True,
+                    )
                 doc.close()
 
             generator.cleanup()
@@ -718,12 +751,12 @@ else:
         except Exception as e:
             st.error(f"Preview error: {e}")
 
-st.markdown("---")
+st.divider()
 
 
 # --- Step 4: Generate Certificates ------------------------------------------
 
-st.header("Step 4: Generate Certificates")
+st.markdown(f'## {_icon("bolt")} Step 4: Generate Certificates', unsafe_allow_html=True)
 st.caption(
     "Once you're happy with the preview above, click the button below "
     "to create all certificates at once. You can download them as a ZIP file."
@@ -805,7 +838,10 @@ else:
 
         st.session_state["zip_bytes"] = zip_buffer.getvalue()
 
-        st.success(f"Generated **{len(generated)}** certificates!")
+        st.success(
+            f"Successfully generated **{len(generated)}** certificates. "
+            "Download them below or proceed to send via email."
+        )
         if errors:
             st.warning(f"{len(errors)} failed:")
             with st.expander("View errors"):
@@ -955,15 +991,15 @@ else:
         ):
             _show_certificates_dialog()
 
-st.markdown("---")
+st.divider()
 
 
 # --- Step 5: Email Certificates ---------------------------------------------
 
-st.header("Step 5: Send via Email")
+st.markdown(f'## {_icon("send")} Step 5: Review & Send', unsafe_allow_html=True)
 st.caption(
-    "Send each attendee their personalized certificate as an email attachment. "
-    "You can customize the message below — use {name} to insert each person's name."
+    "Download all certificates as a ZIP, or send each attendee their personalized "
+    "certificate directly via email. Use {name} to insert each person's name in the message."
 )
 
 if not st.session_state["generated_certs"]:
@@ -1125,16 +1161,5 @@ else:
 
 # --- Footer -----------------------------------------------------------------
 
-st.markdown("---")
-col_footer1, col_footer2 = st.columns([3, 1])
-with col_footer1:
-    st.caption(
-        f"CertFlow v{APP_VERSION} • Built with Streamlit • "
-        "Generate certificates, send with confidence."
-    )
-with col_footer2:
-    st.markdown(
-        f'{_icon("coffee", 16)} '
-        '[Buy Me a Coffee](https://buymeacoffee.com/certflow)',
-        unsafe_allow_html=True,
-    )
+st.divider()
+st.caption("CertFlow v1.0.0 \u2022 Property of AWSSB Global City \u2022 Built with Streamlit")

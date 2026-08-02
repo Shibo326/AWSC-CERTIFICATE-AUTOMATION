@@ -49,10 +49,10 @@ class TemplateStep:
     def build(self) -> ft.Control:
         """Build the template upload and preview UI controls."""
         self._preview_image = ft.Image(
-            src_base64="",
+            src="",
             width=400,
             height=280,
-            fit=ft.ImageFit.CONTAIN,
+            fit=ft.BoxFit.CONTAIN,
             visible=False,
         )
 
@@ -82,9 +82,9 @@ class TemplateStep:
             ),
         )
 
-        # Register file picker overlay
-        if self._file_picker not in self.page.overlay:
-            self.page.overlay.append(self._file_picker)
+        # Register file picker as a service
+        if self._file_picker not in self.page.services:
+            self.page.services.append(self._file_picker)
 
         return ft.Column(
             controls=[
@@ -99,9 +99,9 @@ class TemplateStep:
             spacing=12,
         )
 
-    def _open_file_picker(self, e: ft.ControlEvent) -> None:
+    async def _open_file_picker(self, e: ft.ControlEvent) -> None:
         """Open the file picker dialog filtered to template file types."""
-        self._file_picker.pick_files(
+        await self._file_picker.pick_files(
             allowed_extensions=ALLOWED_EXTENSIONS,
             dialog_title="Select Certificate Template",
             allow_multiple=False,
@@ -226,7 +226,7 @@ class TemplateStep:
         try:
             if fmt in ("png", "jpg"):
                 encoded = base64.b64encode(file_bytes).decode("ascii")
-                self._preview_image.src_base64 = encoded
+                self._preview_image.src = encoded
                 self._preview_image.visible = True
             elif fmt == "pdf":
                 try:
@@ -238,7 +238,7 @@ class TemplateStep:
                         pix = pdf_page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
                         png_bytes = pix.tobytes("png")
                         encoded = base64.b64encode(png_bytes).decode("ascii")
-                        self._preview_image.src_base64 = encoded
+                        self._preview_image.src = encoded
                         self._preview_image.visible = True
                     doc.close()
                 except ImportError:
@@ -271,7 +271,7 @@ class TemplateStep:
         self.template_data = None
         self.template_format = None
         self.template_filename = None
-        self._preview_image.src_base64 = ""
+        self._preview_image.src = ""
         self._preview_image.visible = False
         self._status_text.value = "No template uploaded"
         self._status_text.color = ft.Colors.GREY

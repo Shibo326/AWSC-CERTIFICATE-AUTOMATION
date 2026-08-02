@@ -5,9 +5,7 @@ connects callbacks to update shared state, and provides settings
 access via AppBar gear icon.
 """
 
-import asyncio
 import logging
-from pathlib import Path
 from typing import Dict, List, Optional
 
 import flet as ft
@@ -40,6 +38,16 @@ STEP_LABELS = [
     "Send",
 ]
 
+# Tooltip hints shown when hovering each sidebar step
+STEP_TOOLTIPS = [
+    "Upload your certificate template (PNG, JPG or PDF)",
+    "Upload the attendee list (CSV or XLSX)",
+    "Choose font, size, colour and text position",
+    "Generate all certificates in one batch",
+    "Preview and individually edit generated certificates",
+    "Download a ZIP or send certificates by email",
+]
+
 
 def main(page: ft.Page) -> None:
     """Application entry point — configure page and build UI."""
@@ -57,7 +65,7 @@ def main(page: ft.Page) -> None:
         "template_format": None,
         "template_filename": None,
         "attendees": [],
-        "font_config": None,
+        "font_config": FontConfiguration(),  # Always non-None so GenerateStep never crashes
         "vertical_position": 50,
         "certificates": [],
     }
@@ -143,6 +151,8 @@ def main(page: ft.Page) -> None:
             certificates=result.certificates,
             attendees=certflow_state["attendees"],
         )
+        # Ensure UI reflects updated data regardless of the currently active step
+        page.update()
         _go_to_step(4)
 
     def on_send_complete(result: SendResult) -> None:
@@ -254,7 +264,7 @@ def main(page: ft.Page) -> None:
     step_nav_column = ft.Column(
         controls=_build_step_buttons(),
         spacing=4,
-        width=180,
+        width=190,
     )
 
     # ------------------------------------------------------------------
@@ -347,19 +357,16 @@ def main(page: ft.Page) -> None:
                 ft.TextButton("Close", on_click=lambda e: _close_dialog()),
             ],
         )
-        page.overlay.append(dialog)
-        dialog.open = True
-        page.update()
+        page.open(dialog)
 
         def _close_dialog() -> None:
-            dialog.open = False
-            page.update()
+            page.close(dialog)
 
     # ------------------------------------------------------------------
     # AppBar with gear icon and queue status badge
     # ------------------------------------------------------------------
     queue_badge = ft.Badge(
-        text="0",
+        label="0",
         small_size=10,
     )
 
@@ -412,13 +419,10 @@ def main(page: ft.Page) -> None:
                 ft.TextButton("Close", on_click=lambda e: _close_queue()),
             ],
         )
-        page.overlay.append(dialog)
-        dialog.open = True
-        page.update()
+        page.open(dialog)
 
         def _close_queue() -> None:
-            dialog.open = False
-            page.update()
+            page.close(dialog)
 
     # ------------------------------------------------------------------
     # Main layout: sidebar + content area
@@ -483,7 +487,7 @@ def main(page: ft.Page) -> None:
         try:
             status = await queue_manager.get_status()
             if status.pending_count > 0:
-                queue_badge.text = str(status.pending_count)
+                queue_badge.label = str(status.pending_count)
                 queue_badge_container.visible = True
                 page.update()
         except Exception as exc:
@@ -497,4 +501,4 @@ def main(page: ft.Page) -> None:
 
 
 if __name__ == "__main__":
-    ft.app(target=main)  # ft.app delegates to ft.run internally  # Use ft.app for compatibility; ft.run() for Flet 0.80+
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=8550)

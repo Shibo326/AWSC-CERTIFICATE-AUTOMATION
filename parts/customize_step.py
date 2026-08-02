@@ -81,13 +81,13 @@ class CustomizeStep:
         """Build dropdown options from all available fonts.
 
         Returns:
-            List of ft.dropdown.Option for each available font.
+            List of ft.DropdownOption for each available font.
         """
         fonts = self.font_manager.get_available_fonts()
         options = []
         for font_info in fonts:
             options.append(
-                ft.dropdown.Option(
+                ft.DropdownOption(
                     key=font_info.name,
                     text=font_info.name,
                 )
@@ -132,6 +132,13 @@ class CustomizeStep:
         self._position_label.value = f"{self.vertical_position}%"
         self._position_label.update()
         self._notify_change()
+
+    async def _on_import_click(self, e: ft.ControlEvent) -> None:
+        """Open the font file picker dialog."""
+        await self._font_picker.pick_files(
+            allowed_extensions=["ttf"],
+            dialog_title="Select TTF Font File",
+        )
 
     def _on_import_font_result(self, e: ft.FilePickerResultEvent) -> None:
         """Handle font import file picker result."""
@@ -239,7 +246,7 @@ class CustomizeStep:
             label="Font Family",
             value=self.selected_font,
             options=self._build_font_options(),
-            on_change=self._on_font_changed,
+            on_select=self._on_font_changed,
             width=280,
         )
 
@@ -262,7 +269,7 @@ class CustomizeStep:
             width=140,
             on_blur=self._on_color_changed,
             on_submit=self._on_color_changed,
-            prefix_text="#",
+            prefix=ft.Text("#"),
         )
 
         self._color_preview = ft.Container(
@@ -300,15 +307,12 @@ class CustomizeStep:
         import_btn = ft.OutlinedButton(
             "Import Font (.ttf)",
             icon=ft.Icons.ADD_CIRCLE_OUTLINE,
-            on_click=lambda _: self._font_picker.pick_files(
-                allowed_extensions=["ttf"],
-                dialog_title="Select TTF Font File",
-            ),
+            on_click=self._on_import_click,
         )
 
         # Assemble the layout
-        if self._font_picker not in self.page.overlay:
-            self.page.overlay.append(self._font_picker)
+        if self._font_picker not in self.page.services:
+            self.page.services.append(self._font_picker)
 
         return ft.Column(
             [

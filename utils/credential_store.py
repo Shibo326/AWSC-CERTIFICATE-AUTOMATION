@@ -265,6 +265,14 @@ class CredentialStore:
         else:
             logger.debug("No fallback credentials file to remove.")
 
+    async def has_credentials(self) -> bool:
+        """Alias for is_configured(). Check if credentials are stored.
+
+        Returns:
+            True if both email and app_password are stored, False otherwise.
+        """
+        return await self.is_configured()
+
     async def is_configured(self) -> bool:
         """Check if credentials exist in storage or fallback file.
 
