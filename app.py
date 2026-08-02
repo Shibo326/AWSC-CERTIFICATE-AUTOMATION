@@ -344,21 +344,15 @@ def _do_send_emails() -> None:
 def _render_sidebar() -> None:
     """Render the sidebar with app info and status."""
     with st.sidebar:
-        # Sidebar header with compact logo + text
+        # Sidebar header — logo centered + compact brand text
         _logo_path = Path("image/NEW_AWSLC_LOGO-removebg-preview.png")
         if _logo_path.exists():
-            _sb_logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
-            st.markdown(
-                f'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;">'
-                f'<img src="data:image/png;base64,{_sb_logo_b64}" width="40" height="40" style="border-radius:50%;">'
-                f'<div><strong style="font-size:1.1rem;">CertFlow</strong><br>'
-                f'<span style="font-size:0.7rem;color:#94a3b8;">AWSSB Global City</span></div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown("**CertFlow**")
-            st.caption("AWSSB Global City")
+            st.image(str(_logo_path), use_container_width=True)
+        st.markdown(
+            '<p style="text-align:center;font-weight:700;font-size:1.3rem;margin:0;">CertFlow</p>'
+            '<p style="text-align:center;font-size:0.75rem;color:#64748b;margin:0;">Property of AWSSB Global City</p>',
+            unsafe_allow_html=True,
+        )
         st.markdown("---")
 
         st.markdown("### Status")
