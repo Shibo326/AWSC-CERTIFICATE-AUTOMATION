@@ -1,4 +1,4 @@
-"""CertFlow — Automated Certificate Generator and Email Sender."""
+﻿"""CertFlow — Automated Certificate Generator and Email Sender."""
 
 import base64
 import io
@@ -350,7 +350,7 @@ def _render_sidebar() -> None:
             st.image(str(_logo_path), use_container_width=True)
         st.markdown(
             '<p style="text-align:center;font-weight:700;font-size:1.3rem;margin:0;">CertFlow</p>'
-            '<p style="text-align:center;font-size:0.75rem;color:#64748b;margin:0;">Property of AWSSB Global City</p>',
+            '<p style="text-align:center;font-size:0.75rem;color:#64748b;margin:0;">AWSSBG Global City</p>',
             unsafe_allow_html=True,
         )
         st.markdown("---")
@@ -1174,4 +1174,4 @@ else:
 # --- Footer -----------------------------------------------------------------
 
 st.divider()
-st.caption("CertFlow v1.0.0 \u2022 Property of AWSSB Global City \u2022 Built with Streamlit")
+st.caption("CertFlow v1.0.0 \u2022 AWSSBG Global City \u2022 Built with Streamlit")
