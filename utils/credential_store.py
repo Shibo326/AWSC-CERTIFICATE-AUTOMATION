@@ -302,9 +302,12 @@ class CredentialStore:
     async def store_fallback(self, email: str, app_password: str) -> None:
         """Write credentials to ~/.certflow/credentials.toml in encoded form.
 
-        Uses base64 encoding with a machine-specific XOR salt derived from
-        platform.node() for obfuscation. This is a fallback only used when
-        platform-native secure storage is unavailable.
+        SECURITY NOTE: The encoding here (base64 + XOR with a machine-derived
+        salt) is obfuscation, NOT encryption — anyone with read access to the
+        file and the machine can recover the App Password. This path is a
+        last-resort fallback used only when the platform's native secure
+        storage (Keychain / Keystore / DPAPI) is unavailable. The file is
+        written with owner-only permissions where the OS supports it.
 
         Args:
             email: Gmail address to store.
@@ -313,6 +316,13 @@ class CredentialStore:
         Raises:
             OSError: If the directory or file cannot be created/written.
         """
+        logger.warning(
+            "Storing Gmail credentials in the INSECURE fallback file %s "
+            "(obfuscated, not encrypted). Platform secure storage was "
+            "unavailable. Treat this file as sensitive.",
+            FALLBACK_FILE,
+        )
+
         FALLBACK_DIR.mkdir(parents=True, exist_ok=True)
 
         encoded_email = _encode_value(email)
@@ -325,6 +335,14 @@ class CredentialStore:
         )
 
         FALLBACK_FILE.write_text(content, encoding="utf-8")
+
+        # Restrict to owner read/write only where the OS supports it (POSIX).
+        try:
+            os.chmod(FALLBACK_FILE, 0o600)
+        except (OSError, NotImplementedError):
+            # e.g. Windows without POSIX perms — best effort only.
+            pass
+
         logger.info(
             "Credentials stored in fallback file: %s", FALLBACK_FILE
         )

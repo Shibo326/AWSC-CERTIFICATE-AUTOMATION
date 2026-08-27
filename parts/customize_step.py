@@ -7,12 +7,18 @@ setting is modified, enabling live preview updates within 2 seconds.
 Requirements: 11.3, 11.4, 5.4
 """
 
+import logging
 import re
 from typing import Callable, Dict, Optional
 
 import flet as ft
 
+from utils.certificate_generator import CertificateGenerator
+from utils.font_config import FontConfiguration
 from utils.font_manager import FontManager
+from utils.preview_renderer import render_preview_base64
+
+logger = logging.getLogger(__name__)
 
 
 # Hex color validation pattern: # followed by exactly 6 hex digits.
@@ -52,6 +58,11 @@ class CustomizeStep:
         self.font_color: str = "#000000"
         self.vertical_position: int = 50
 
+        # Live-preview source (set by the host once a template is uploaded).
+        self._preview_template_bytes: Optional[bytes] = None
+        self._preview_template_format: Optional[str] = None
+        self._preview_sample_name: str = "Sample Name"
+
     def _get_settings(self) -> Dict:
         """Return the current settings as a dictionary.
 
@@ -73,9 +84,95 @@ class CustomizeStep:
         }
 
     def _notify_change(self) -> None:
-        """Invoke the on_settings_changed callback with current settings."""
+        """Invoke the on_settings_changed callback and refresh the preview."""
         if self.on_settings_changed:
             self.on_settings_changed(self._get_settings())
+        self._update_preview()
+
+    def set_preview_source(
+        self,
+        template_bytes: Optional[bytes],
+        template_format: Optional[str],
+        sample_name: Optional[str] = None,
+    ) -> None:
+        """Provide the template and sample name used for the live preview.
+
+        The host (main.py) calls this once a template is uploaded and an
+        attendee list is available, so the customization step can show a real
+        certificate preview instead of blind editing.
+
+        Args:
+            template_bytes: Raw template bytes (png/jpg/pdf).
+            template_format: Template format string.
+            sample_name: Name to render in the preview (first attendee).
+        """
+        self._preview_template_bytes = template_bytes
+        self._preview_template_format = template_format
+        if sample_name:
+            self._preview_sample_name = sample_name
+        self._update_preview()
+
+    def _update_preview(self) -> None:
+        """Render the live certificate preview with the current settings.
+
+        No-op when no template source has been provided yet or the preview
+        control has not been built.
+        """
+        preview = getattr(self, "_preview_image", None)
+        if preview is None:
+            return
+
+        if not self._preview_template_bytes or not self._preview_template_format:
+            preview.src = ""
+            preview.visible = False
+            self._maybe_update(preview)
+            self._maybe_update(getattr(self, "_preview_hint", None))
+            return
+
+        generator = None
+        try:
+            settings = self._get_settings()
+            cfg = FontConfiguration(
+                font_path=settings["font_path"] or "assets/fonts/Arial.ttf",
+                font_size=self.font_size,
+                font_color=FontConfiguration.parse_color(self.font_color),
+            )
+            generator = CertificateGenerator(
+                template_bytes=self._preview_template_bytes,
+                template_format=self._preview_template_format,
+                font_config=cfg,
+            )
+            cert = generator.generate(
+                self._preview_sample_name,
+                vertical_position=self.vertical_position,
+                vertical_as_percentage=True,
+            )
+            preview.src = render_preview_base64(cert.certificate, cert.format)
+            preview.visible = bool(preview.src)
+        except Exception as exc:
+            logger.warning("Customize live preview failed: %s", exc)
+            preview.src = ""
+            preview.visible = False
+        finally:
+            if generator:
+                generator.cleanup()
+
+        hint = getattr(self, "_preview_hint", None)
+        if hint is not None:
+            hint.visible = not preview.visible
+        self._maybe_update(preview)
+        self._maybe_update(hint)
+
+    @staticmethod
+    def _maybe_update(control: Optional[ft.Control]) -> None:
+        """Call control.update() defensively (no-op if not yet on a page)."""
+        if control is None:
+            return
+        try:
+            control.update()
+        except Exception:
+            # Control not attached to a page yet; ignore.
+            pass
 
     def _build_font_options(self) -> list:
         """Build dropdown options from all available fonts.
@@ -310,9 +407,28 @@ class CustomizeStep:
             on_click=self._on_import_click,
         )
 
+        # Live preview surface
+        self._preview_image = ft.Image(
+            src="",
+            width=500,
+            height=350,
+            fit=ft.BoxFit.CONTAIN,
+            visible=False,
+        )
+        self._preview_hint = ft.Text(
+            "Upload a template and attendee list to see a live preview here.",
+            size=12,
+            italic=True,
+            color=ft.Colors.GREY_600,
+            visible=True,
+        )
+
         # Assemble the layout
         if self._font_picker not in self.page.services:
             self.page.services.append(self._font_picker)
+
+        # Render an initial preview if a source was set before build().
+        self._update_preview()
 
         return ft.Column(
             [
@@ -365,6 +481,14 @@ class CustomizeStep:
                     italic=True,
                     color=ft.Colors.GREY_600,
                 ),
+                ft.Divider(height=1),
+                ft.Text(
+                    "Live Preview",
+                    size=14,
+                    weight=ft.FontWeight.W_600,
+                ),
+                self._preview_hint,
+                self._preview_image,
             ],
             spacing=12,
         )

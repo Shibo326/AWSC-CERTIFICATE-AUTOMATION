@@ -1,4 +1,4 @@
-﻿"""CertFlow — Automated Certificate Generator and Email Sender."""
+"""CertFlow — Automated Certificate Generator and Email Sender."""
 
 import base64
 import io
@@ -29,6 +29,43 @@ from utils.models import (
     GmailCredentials,
     SendResult,
 )
+from utils.preview_renderer import render_preview_png
+
+
+@st.cache_data(show_spinner=False, max_entries=64)
+def _cached_preview_png(
+    template_bytes: bytes,
+    template_format: str,
+    font_path: str,
+    font_color: str,
+    name: str,
+    font_size: int,
+    v_pos: int,
+) -> bytes:
+    """Render a downscaled certificate preview and return PNG bytes (cached).
+
+    Cached by all arguments, so dragging a slider back to a previous
+    value is instant. Only new combinations trigger a real render, and the
+    shared renderer downscales the image so a full-resolution template is not
+    encoded just to be shown small.
+    """
+    cfg = FontConfiguration(
+        font_path=font_path or "assets/fonts/Arial.ttf",
+        font_size=font_size,
+        font_color=FontConfiguration.parse_color(font_color),
+    )
+    gen = CertificateGenerator(
+        template_bytes=template_bytes,
+        template_format=template_format,
+        font_config=cfg,
+    )
+    try:
+        cert = gen.generate(
+            name, vertical_position=v_pos, vertical_as_percentage=True
+        )
+        return render_preview_png(cert.certificate, cert.format)
+    finally:
+        gen.cleanup()
 
 
 def get_streamlit_credentials() -> Optional[GmailCredentials]:
@@ -191,21 +228,92 @@ st.markdown("""
         font-size: 0.75rem;
     }
 
-    /* Responsive columns — stack on small screens */
+    /* Button styling */
+    .stButton > button {
+        border-radius: 0.375rem;
+        font-weight: 500;
+        min-height: 44px;  /* touch-friendly target */
+    }
+
+    /* ============================================================
+       RESPONSIVE LAYOUT — all screen sizes
+       ============================================================ */
+
+    /* Tablet & below (<= 992px): tighten container padding */
+    @media (max-width: 992px) {
+        .block-container {
+            padding-left: 1.25rem !important;
+            padding-right: 1.25rem !important;
+            padding-top: 1.25rem !important;
+        }
+    }
+
+    /* Mobile / small tablet (<= 768px): stack all columns full-width */
     @media (max-width: 768px) {
         [data-testid="stHorizontalBlock"] {
             flex-wrap: wrap;
+            gap: 0.5rem;
         }
         [data-testid="stHorizontalBlock"] > div {
             flex: 1 1 100% !important;
             min-width: 100% !important;
         }
+        /* Smaller headings on mobile */
+        h1 { font-size: 1.6rem !important; }
+        h2 { font-size: 1.25rem !important; }
+        h3 { font-size: 1.1rem !important; }
+        /* Full-width buttons for easy tapping */
+        .stButton > button,
+        .stDownloadButton > button {
+            width: 100% !important;
+        }
+        /* Constrain preview images so they fit small screens */
+        [data-testid="stImage"] img {
+            max-height: 60vh !important;
+            width: auto !important;
+            margin: 0 auto !important;
+        }
+        /* Header logo shrinks on mobile */
+        .block-container img[alt="AWSSBG Global City logo"] {
+            height: 72px !important;
+            width: auto !important;
+        }
     }
 
-    /* Button styling */
-    .stButton > button {
-        border-radius: 0.375rem;
-        font-weight: 500;
+    /* Very small phones (<= 480px): minimal padding, bigger tap targets */
+    @media (max-width: 480px) {
+        .block-container {
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }
+        h1 { font-size: 1.4rem !important; }
+        .stButton > button,
+        .stDownloadButton > button {
+            min-height: 48px;
+            font-size: 1rem !important;
+        }
+    }
+
+    /* Large desktop (>= 1400px): cap content width for readability */
+    @media (min-width: 1400px) {
+        .block-container {
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+    }
+
+    /* Dialogs / modals responsive width */
+    @media (max-width: 768px) {
+        div[data-testid="stDialog"] > div,
+        div[role="dialog"] {
+            width: 95vw !important;
+            max-width: 95vw !important;
+        }
+    }
+
+    /* Prevent horizontal scroll anywhere */
+    .main, .block-container {
+        overflow-x: hidden;
     }
 
     /* Material icon helper */
@@ -259,7 +367,15 @@ def _init_session_state() -> None:
         "vertical_position": 50,
         "email_subject": "Your Certificate — {name}",
         "email_body": (
-            "Dear {name},\n\n"
+            "GOOD DAY PILOT! {name},\n\n"
+            "Please find your certificate attached.\n\n"
+            "Congratulations!\n"
+            "Best regards"
+        ),
+        # Editable pieces around the locked {name} chip (UX split).
+        "subject_prefix": "Your Certificate — ",
+        "body_message": (
+            "\n\n"
             "Please find your certificate attached.\n\n"
             "Congratulations!\n"
             "Best regards"
@@ -277,6 +393,16 @@ def _init_session_state() -> None:
 
 
 _init_session_state()
+
+
+# --- Helper: Live preview refresh -------------------------------------------
+
+def _refresh_preview() -> None:
+    """No-op callback used to trigger an immediate rerun when the email
+    subject or body changes, so the live preview updates automatically."""
+    # Streamlit reruns the script after an on_change callback returns, which
+    # is enough to refresh the preview. No extra work is needed here.
+    return None
 
 
 # --- Helper: Send Emails ----------------------------------------------------
@@ -457,11 +583,13 @@ logo_path = Path("image/NEW_AWSLC_LOGO-removebg-preview.png")
 if logo_path.exists():
     logo_b64 = base64.b64encode(logo_path.read_bytes()).decode()
     st.markdown(
-        f'<div style="display:flex;align-items:center;gap:16px;margin-bottom:8px;">'
-        f'<img src="data:image/png;base64,{logo_b64}" width="100" height="100">'
+        f'<div style="display:flex;align-items:center;gap:20px;margin-bottom:8px;">'
+        f'<img src="data:image/png;base64,{logo_b64}" '
+        f'style="height:120px;width:auto;object-fit:contain;flex-shrink:0;" '
+        f'alt="AWSSBG Global City logo">'
         f'<div>'
-        f'<h1 style="margin:0;font-size:2.2rem;">CertFlow</h1>'
-        f'<p style="margin:0;color:#64748b;font-size:0.9rem;">Automated Certificate Generator</p>'
+        f'<h1 style="margin:0;font-size:2.6rem;line-height:1.1;">CertFlow</h1>'
+        f'<p style="margin:0;color:#64748b;font-size:1rem;">Automated Certificate Generator</p>'
         f'</div>'
         f'</div>',
         unsafe_allow_html=True,
@@ -521,37 +649,56 @@ if uploaded_template is not None:
         if ext == "jpeg":
             ext = "jpg"
 
-        st.session_state["template_file"] = uploaded_template
-        st.session_state["template_format"] = ext
-
-        st.success(
-            f"Template uploaded: **{uploaded_template.name}** ({ext.upper()})"
-        )
-
-        if ext in ("png", "jpg"):
-            preview_image = Image.open(uploaded_template)
-            st.image(
-                preview_image,
-                caption="Template Preview",
-                width=500,
+        try:
+            if ext in ("png", "jpg"):
+                preview_image = Image.open(uploaded_template)
+                # Force a decode so a corrupt/spoofed image fails here,
+                # not deep inside certificate generation.
+                preview_image.verify()
+                uploaded_template.seek(0)
+                preview_image = Image.open(uploaded_template)
+                st.image(
+                    preview_image,
+                    caption="Template Preview",
+                    width=500,
+                )
+                uploaded_template.seek(0)
+            elif ext == "pdf":
+                uploaded_template.seek(0)
+                pdf_bytes = uploaded_template.read()
+                doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+                try:
+                    if doc.page_count == 0:
+                        raise ValueError("PDF has no pages.")
+                    page = doc[0]
+                    pix = page.get_pixmap(dpi=100)
+                    preview_img = Image.frombytes(
+                        "RGB", [pix.width, pix.height], pix.samples
+                    )
+                finally:
+                    doc.close()
+                st.image(
+                    preview_img,
+                    caption="Template Preview (Page 1)",
+                    width=500,
+                )
+                uploaded_template.seek(0)
+        except Exception as e:
+            # Corrupt file, wrong contents behind a valid extension, etc.
+            st.session_state["template_file"] = None
+            st.session_state["template_format"] = None
+            st.error(
+                "That file couldn't be opened as a valid "
+                f"{ext.upper()} template. Please upload a genuine PNG, JPG, "
+                "or PDF certificate design and try again."
             )
-            uploaded_template.seek(0)
-        elif ext == "pdf":
-            uploaded_template.seek(0)
-            pdf_bytes = uploaded_template.read()
-            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-            page = doc[0]
-            pix = page.get_pixmap(dpi=100)
-            preview_img = Image.frombytes(
-                "RGB", [pix.width, pix.height], pix.samples
+        else:
+            st.session_state["template_file"] = uploaded_template
+            st.session_state["template_format"] = ext
+            st.success(
+                f"Template uploaded: **{uploaded_template.name}** "
+                f"({ext.upper()})"
             )
-            st.image(
-                preview_img,
-                caption="Template Preview (Page 1)",
-                width=500,
-            )
-            doc.close()
-            uploaded_template.seek(0)
 
 st.divider()
 
@@ -607,7 +754,13 @@ else:
                 if uploaded_csv.name.endswith(".xlsx"):
                     result = parser.parse_xlsx(uploaded_csv.read())
                 else:
-                    content = uploaded_csv.read().decode("utf-8")
+                    try:
+                        content = uploaded_csv.read().decode("utf-8-sig")
+                    except UnicodeDecodeError:
+                        raise ValueError(
+                            "The file isn't valid UTF-8 text. Re-save it as "
+                            "CSV UTF-8 (or upload an .xlsx) and try again."
+                        )
                     result = parser.parse(content)
 
                 st.session_state["attendees"] = result.records
@@ -642,7 +795,16 @@ else:
                             )
 
             except ValueError as e:
+                st.session_state["attendees"] = []
                 st.error(f"{e}")
+            except Exception:
+                # Corrupt/unreadable file that isn't a clean ValueError.
+                st.session_state["attendees"] = []
+                st.error(
+                    "That file couldn't be read as a valid attendee list. "
+                    "Make sure it's a real CSV or XLSX with 'name' and "
+                    "'email' columns, then try again."
+                )
 
 st.divider()
 
@@ -714,51 +876,23 @@ else:
             template_file.seek(0)
 
             font_path = resolve_font_path(selected_font)
-            font_cfg = FontConfiguration(
-                font_path=font_path or "assets/fonts/Arial.ttf",
-                font_size=font_size,
-                font_color=FontConfiguration.parse_color(font_color),
-            )
 
-            generator = CertificateGenerator(
-                template_bytes=template_bytes,
-                template_format=template_format,
-                font_config=font_cfg,
-            )
-
-            preview_cert = generator.generate(
+            # Cached render — only recomputes when a setting actually changes
+            preview_png = _cached_preview_png(
+                template_bytes,
+                template_format,
+                font_path or "assets/fonts/Arial.ttf",
+                font_color,
                 preview_name,
-                vertical_position=vertical_position,
-                vertical_as_percentage=True,
+                font_size,
+                vertical_position,
             )
-
-            if isinstance(preview_cert.certificate, Image.Image):
-                # Show full-res image with use_container_width for responsive sizing
-                # Streamlit's built-in fullscreen button will show it at full resolution
-                with st.container(border=True):
-                    st.image(
-                        preview_cert.certificate,
-                        caption=f"Preview: {preview_name}",
-                        use_container_width=True,
-                    )
-            else:
-                doc = fitz.open(
-                    stream=preview_cert.certificate, filetype="pdf"
+            with st.container(border=True):
+                st.image(
+                    preview_png,
+                    caption=f"Preview: {preview_name}",
+                    use_container_width=True,
                 )
-                page = doc[0]
-                pix = page.get_pixmap(dpi=150)
-                img = Image.frombytes(
-                    "RGB", [pix.width, pix.height], pix.samples
-                )
-                with st.container(border=True):
-                    st.image(
-                        img,
-                        caption=f"Preview: {preview_name}",
-                        use_container_width=True,
-                    )
-                doc.close()
-
-            generator.cleanup()
 
         except Exception as e:
             st.error(f"Preview error: {e}")
@@ -833,6 +967,11 @@ else:
 
         st.session_state["generated_certs"] = generated
         st.session_state["generation_done"] = True
+        # Store generation context for per-certificate editing in zoom dialog
+        st.session_state["gen_template_bytes"] = template_bytes
+        st.session_state["gen_template_format"] = template_format
+        st.session_state["gen_font_path"] = font_path or "assets/fonts/Arial.ttf"
+        st.session_state["gen_font_color"] = st.session_state["font_color"]
 
         # Build ZIP
         zip_buffer = io.BytesIO()
@@ -860,11 +999,30 @@ else:
                 for name, msg in errors:
                     st.text(f"{name}: {msg}")
 
-    # Download ZIP
-    if st.session_state["zip_bytes"]:
+    # Download ZIP — rebuilt live from current certs (reflects any edits)
+    if st.session_state["generated_certs"]:
+        _zip_buf = io.BytesIO()
+        _used_names: set = set()
+        with zipfile.ZipFile(_zip_buf, "w", zipfile.ZIP_DEFLATED) as _zf:
+            for _cert in st.session_state["generated_certs"]:
+                _base = _cert.attendee_name.replace(" ", "_")
+                _fname = f"{_base}.{_cert.format}"
+                _n = 2
+                while _fname in _used_names:
+                    _fname = f"{_base}_{_n}.{_cert.format}"
+                    _n += 1
+                _used_names.add(_fname)
+                if isinstance(_cert.certificate, Image.Image):
+                    _ib = io.BytesIO()
+                    _cert.certificate.save(
+                        _ib, format="PNG" if _cert.format == "png" else "JPEG"
+                    )
+                    _zf.writestr(_fname, _ib.getvalue())
+                else:
+                    _zf.writestr(_fname, _cert.certificate)
         st.download_button(
             label="Download All (ZIP)",
-            data=st.session_state["zip_bytes"],
+            data=_zip_buf.getvalue(),
             file_name="certificates.zip",
             mime="application/zip",
             type="secondary",
@@ -928,6 +1086,63 @@ else:
                             st.session_state["zoom_cert_idx"] = cert_idx
                             st.rerun()
 
+        def _regenerate_single_cert(cert_idx, new_name, new_font_size, new_v_pos):
+            """Regenerate ONLY one certificate with adjusted settings."""
+            template_bytes = st.session_state.get("gen_template_bytes")
+            template_format = st.session_state.get("gen_template_format")
+            font_path = st.session_state.get(
+                "gen_font_path", "assets/fonts/Arial.ttf"
+            )
+            font_color = st.session_state.get("gen_font_color", "#000000")
+
+            if not template_bytes:
+                st.error("Cannot regenerate: template no longer available.")
+                return
+
+            single_cfg = FontConfiguration(
+                font_path=font_path,
+                font_size=new_font_size,
+                font_color=FontConfiguration.parse_color(font_color),
+            )
+            single_gen = CertificateGenerator(
+                template_bytes=template_bytes,
+                template_format=template_format,
+                font_config=single_cfg,
+            )
+            try:
+                new_cert = single_gen.generate(
+                    new_name,
+                    vertical_position=new_v_pos,
+                    vertical_as_percentage=True,
+                )
+                # Replace ONLY this certificate — others untouched
+                st.session_state["generated_certs"][cert_idx] = new_cert
+            finally:
+                single_gen.cleanup()
+
+        def _build_preview_image(name, font_size, v_pos):
+            """Return cached PNG bytes for a live preview (fast on repeats)."""
+            template_bytes = st.session_state.get("gen_template_bytes")
+            template_format = st.session_state.get("gen_template_format")
+            font_path = st.session_state.get(
+                "gen_font_path", "assets/fonts/Arial.ttf"
+            )
+            font_color = st.session_state.get("gen_font_color", "#000000")
+            if not template_bytes:
+                return None
+            try:
+                return _cached_preview_png(
+                    template_bytes,
+                    template_format,
+                    font_path,
+                    font_color,
+                    name,
+                    font_size,
+                    v_pos,
+                )
+            except Exception:
+                return None
+
         @st.dialog("Certificate Fullscreen", width="large")
         def _show_zoom_dialog():
             cert_idx = st.session_state.get("zoom_cert_idx", 0)
@@ -940,29 +1155,66 @@ else:
                 f"{cert_obj.attendee_name}"
             )
 
-            if isinstance(cert_obj.certificate, Image.Image):
+            # --- Adjustment controls FIRST so preview reflects them live ---
+            with st.expander("Adjust this certificate", expanded=True):
+                st.caption(
+                    "Drag the sliders — the preview updates automatically. "
+                    "Click Save to keep the changes. Other certificates "
+                    "stay unchanged."
+                )
+                edit_name = st.text_input(
+                    "Name on certificate",
+                    value=cert_obj.attendee_name,
+                    key=f"edit_name_{cert_idx}",
+                )
+                adj_col1, adj_col2 = st.columns(2)
+                with adj_col1:
+                    edit_size = st.slider(
+                        "Font Size",
+                        min_value=10,
+                        max_value=120,
+                        value=st.session_state["font_size"],
+                        step=2,
+                        key=f"edit_size_{cert_idx}",
+                    )
+                with adj_col2:
+                    edit_vpos = st.slider(
+                        "Vertical Position (%)",
+                        min_value=0,
+                        max_value=100,
+                        value=st.session_state["vertical_position"],
+                        key=f"edit_vpos_{cert_idx}",
+                    )
+
+            # --- Live preview reflects current slider values automatically ---
+            preview_name = edit_name.strip() or cert_obj.attendee_name
+            live_img = _build_preview_image(preview_name, edit_size, edit_vpos)
+            if live_img is not None:
+                st.image(
+                    live_img,
+                    caption=f"Live preview: {preview_name}",
+                    use_container_width=True,
+                )
+            elif isinstance(cert_obj.certificate, Image.Image):
                 st.image(
                     cert_obj.certificate,
                     caption=cert_obj.attendee_name,
                     use_container_width=True,
                 )
-            else:
-                cert_doc = fitz.open(
-                    stream=cert_obj.certificate, filetype="pdf"
+
+            # --- Save button ---
+            if st.button(
+                "Save changes",
+                type="primary",
+                icon=":material/save:",
+                use_container_width=True,
+                key=f"apply_edit_{cert_idx}",
+            ):
+                _regenerate_single_cert(
+                    cert_idx, preview_name, edit_size, edit_vpos
                 )
-                cert_page = cert_doc[0]
-                cert_pix = cert_page.get_pixmap(dpi=150)
-                cert_img = Image.frombytes(
-                    "RGB",
-                    [cert_pix.width, cert_pix.height],
-                    cert_pix.samples,
-                )
-                st.image(
-                    cert_img,
-                    caption=cert_obj.attendee_name,
-                    use_container_width=True,
-                )
-                cert_doc.close()
+                st.success("Saved.")
+                st.rerun()
 
             # Navigation buttons
             nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
@@ -1082,32 +1334,88 @@ else:
             st.success("Gmail credentials ready.")
 
         st.subheader("Email Template")
-        col1, col2 = st.columns(2)
 
-        with col1:
-            email_subject = st.text_input(
-                "Subject",
-                value=st.session_state["email_subject"],
-                help="Use {name} as placeholder for attendee name.",
-            )
-            st.session_state["email_subject"] = email_subject
+        num_recipients = len(st.session_state["attendees"])
 
-        with col2:
-            st.markdown("**Available placeholders:** `{name}`")
-
-        email_body = st.text_area(
-            "Body",
-            value=st.session_state["email_body"],
-            height=150,
-            help="Use {name} as placeholder for attendee name.",
+        # "To" is handled automatically — recipients come straight from the file.
+        st.info(
+            f"**Recipients are automatic.** Each of the "
+            f"**{num_recipients}** emails goes to the address in your "
+            f"uploaded file — you don't set this manually. The "
+            f"**Attendee's Name** chip is locked in place and fills in each "
+            f"person's real name automatically, so it can't be deleted by "
+            f"accident.",
+            icon=":material/mark_email_read:",
         )
+
+        # ---- Subject: editable text + locked name chip ------------------
+        st.markdown("**Subject**")
+        subj_col1, subj_col2 = st.columns([4, 1])
+        with subj_col1:
+            subject_prefix = st.text_input(
+                "Subject text",
+                key="subject_prefix",
+                label_visibility="collapsed",
+                help="Type your subject wording here.",
+                on_change=_refresh_preview,
+            )
+        with subj_col2:
+            st.markdown(
+                "<div style='background:#eef2ff;border:1px solid #c7d2fe;"
+                "border-radius:8px;padding:8px 10px;text-align:center;"
+                "color:#4338ca;font-weight:600;font-size:0.85rem;'>"
+                "🔒 Attendee's Name</div>",
+                unsafe_allow_html=True,
+            )
+        st.caption("The attendee's name is always added at the end of the subject.")
+
+        # Rebuild the full subject with the guaranteed {name} placeholder.
+        email_subject = f"{subject_prefix}{{name}}"
+        st.session_state["email_subject"] = email_subject
+
+        st.markdown("")
+
+        # ---- Body: locked greeting + editable message -------------------
+        st.markdown("**Message body**")
+        body_col1, body_col2 = st.columns([1, 4])
+        with body_col1:
+            st.markdown(
+                "<div style='background:#eef2ff;border:1px solid #c7d2fe;"
+                "border-radius:8px;padding:8px 10px;text-align:center;"
+                "color:#4338ca;font-weight:600;font-size:0.85rem;'>"
+                "🔒 GOOD DAY PILOT!<br>Attendee's Name,</div>",
+                unsafe_allow_html=True,
+            )
+        with body_col2:
+            body_message = st.text_area(
+                "Message text",
+                key="body_message",
+                height=150,
+                label_visibility="collapsed",
+                help="Type your message here. The greeting above is locked.",
+                on_change=_refresh_preview,
+            )
+        st.caption(
+            "The greeting \"GOOD DAY PILOT! [Attendee's Name],\" is locked and "
+            "starts every email. Write the rest of your message on the right."
+        )
+
+        # Rebuild the full body with the guaranteed {name} greeting.
+        email_body = f"GOOD DAY PILOT! {{name}},{body_message}"
         st.session_state["email_body"] = email_body
 
-        # Preview
-        with st.expander("Email Preview"):
-            preview_attendee = st.session_state["attendees"][0]
-            tmpl = EmailTemplate(subject=email_subject, body=email_body)
-            st.markdown(f"**To:** {preview_attendee.email}")
+        st.markdown("")
+
+        # ---- Live preview — always visible ------------------------------
+        preview_attendee = st.session_state["attendees"][0]
+        tmpl = EmailTemplate(subject=email_subject, body=email_body)
+        with st.container(border=True):
+            st.markdown("**Preview** — this is what the first recipient gets:")
+            st.markdown(
+                f"**To:** {preview_attendee.email}  "
+                f"<span style='color:#16a34a;'>&nbsp;(auto from file)</span>",
+                unsafe_allow_html=True,
+            )
             st.markdown(
                 f"**Subject:** {tmpl.render_subject(preview_attendee.name)}"
             )

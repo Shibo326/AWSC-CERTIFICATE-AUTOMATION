@@ -326,6 +326,17 @@ def main(page: ft.Page) -> None:
         current_step_index = index
         step_content.content = step_controls[current_step_index]
         step_nav_column.controls = _build_step_buttons()
+
+        # Feed the customize step's live preview when it becomes active.
+        if current_step_index == 2:
+            attendees = certflow_state["attendees"]
+            sample_name = attendees[0].name if attendees else "Sample Name"
+            customize_step.set_preview_source(
+                template_bytes=certflow_state["template_bytes"],
+                template_format=certflow_state["template_format"],
+                sample_name=sample_name,
+            )
+
         _update_nav_buttons()
         page.update()
 

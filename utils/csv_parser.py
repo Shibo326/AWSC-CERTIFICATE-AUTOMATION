@@ -13,6 +13,29 @@ EMAIL_REGEX = re.compile(
     r"^[a-zA-Z0-9._%+\-']+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
 )
 
+# Control characters (except normal whitespace) that must never reach the
+# certificate renderer or an email header.
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def sanitize_name(name: str) -> str:
+    """Sanitize an attendee name before rendering or emailing.
+
+    Removes control characters (which could corrupt rendered text or, more
+    importantly, be used for header injection in email), and collapses runs of
+    whitespace into single spaces. Visible characters are otherwise preserved.
+
+    Args:
+        name: Raw name value from the uploaded file.
+
+    Returns:
+        A cleaned, single-line name safe to render and put in email headers.
+    """
+    cleaned = _CONTROL_CHARS_RE.sub("", name)
+    # Collapse any whitespace (including newlines/tabs) into single spaces.
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip()
+
 
 class CSVParser:
     """Reads and validates CSV files containing attendee name and email data.
@@ -153,7 +176,7 @@ class CSVParser:
         if row_errors:
             return None, row_errors
 
-        return AttendeeRecord(name=name, email=email), []
+        return AttendeeRecord(name=sanitize_name(name), email=email), []
 
     def _detect_duplicates(
         self, records_with_rows: List[Tuple[int, AttendeeRecord]]

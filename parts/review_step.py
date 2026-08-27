@@ -7,17 +7,15 @@ an attendee name and regenerate only that single certificate.
 Requirements: 11.6, 11.7
 """
 
-import base64
-import io
 import logging
 from typing import Callable, List, Optional
 
 import flet as ft
-from PIL import Image
 
 from utils.certificate_generator import CertificateGenerator
 from utils.font_config import FontConfiguration
 from utils.models import CertificateOutput
+from utils.preview_renderer import render_preview_base64
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +51,10 @@ class ReviewStep:
         self._template_format: Optional[str] = None
         self._font_config: Optional[FontConfiguration] = None
         self._vertical_position: int = 50
+
+        # Reusable generator so a single-name edit does not re-open the
+        # template / re-register fonts on every regeneration.
+        self._generator: Optional[CertificateGenerator] = None
 
     def build(self) -> ft.Control:
         """Build the review gallery UI layout.
@@ -198,6 +200,9 @@ class ReviewStep:
         self._font_config = font_config
         self._vertical_position = vertical_position
 
+        # New template/font settings invalidate any cached generator.
+        self._dispose_generator()
+
         if certificates:
             self._empty_text.visible = False
             self._preview_image.visible = True
@@ -246,48 +251,18 @@ class ReviewStep:
         self._render_preview(cert)
 
     def _render_preview(self, cert: CertificateOutput) -> None:
-        """Render a certificate as a base64 image for display.
+        """Render a certificate as a downscaled, cached base64 preview.
 
-        For PNG/JPG certificates, encodes the PIL Image directly.
-        For PDF certificates, renders the first page via PyMuPDF.
+        Delegates to the shared preview renderer, which downscales the image
+        and caches the encoded result so navigating Prev/Next between already
+        seen certificates is instant.
 
         Args:
             cert: The CertificateOutput to render as preview.
         """
-        try:
-            if cert.format in ("png", "jpg"):
-                # cert.certificate is a PIL Image
-                img: Image.Image = cert.certificate
-                buffer = io.BytesIO()
-                save_format = "PNG" if cert.format == "png" else "JPEG"
-                img.save(buffer, format=save_format)
-                img_bytes = buffer.getvalue()
-                encoded = base64.b64encode(img_bytes).decode("ascii")
-                self._preview_image.src = encoded
-
-            elif cert.format == "pdf":
-                # cert.certificate is PDF bytes — render first page
-                try:
-                    import fitz  # PyMuPDF
-
-                    doc = fitz.open(stream=cert.certificate, filetype="pdf")
-                    if doc.page_count > 0:
-                        pdf_page = doc.load_page(0)
-                        pix = pdf_page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
-                        png_bytes = pix.tobytes("png")
-                        encoded = base64.b64encode(png_bytes).decode("ascii")
-                        self._preview_image.src = encoded
-                    doc.close()
-                except ImportError:
-                    logger.warning("PyMuPDF not available for PDF preview.")
-                    self._preview_image.src = ""
-                except Exception as exc:
-                    logger.warning("PDF preview failed: %s", exc)
-                    self._preview_image.src = ""
-
-        except Exception as exc:
-            logger.warning("Certificate preview failed: %s", exc)
-            self._preview_image.src = ""
+        self._preview_image.src = render_preview_base64(
+            cert.certificate, cert.format
+        )
 
     def _on_prev(self, e: ft.ControlEvent) -> None:
         """Navigate to the previous certificate."""
@@ -339,14 +314,9 @@ class ReviewStep:
             self.page.update()
             return
 
-        # Regenerate only this single certificate
-        generator = None
+        # Regenerate only this single certificate using a reused generator.
         try:
-            generator = CertificateGenerator(
-                template_bytes=self._template_bytes,
-                template_format=self._template_format,
-                font_config=self._font_config or FontConfiguration(),
-            )
+            generator = self._get_generator()
 
             new_cert = generator.generate(
                 attendee_name=new_name,
@@ -373,11 +343,28 @@ class ReviewStep:
             self._edit_status.value = f"Regeneration failed: {exc}"
             self._edit_status.color = ft.Colors.RED
             self._edit_status.visible = True
-        finally:
-            if generator:
-                generator.cleanup()
 
         self.page.update()
+
+    def _get_generator(self) -> CertificateGenerator:
+        """Return a cached CertificateGenerator, creating it on first use.
+
+        Reusing the generator avoids re-opening the template and re-registering
+        fonts on every single-name edit.
+        """
+        if self._generator is None:
+            self._generator = CertificateGenerator(
+                template_bytes=self._template_bytes,
+                template_format=self._template_format,
+                font_config=self._font_config or FontConfiguration(),
+            )
+        return self._generator
+
+    def _dispose_generator(self) -> None:
+        """Clean up and drop the cached generator, if any."""
+        if self._generator is not None:
+            self._generator.cleanup()
+            self._generator = None
 
     def reset(self) -> None:
         """Reset the component to its initial state."""
@@ -387,6 +374,7 @@ class ReviewStep:
         self._template_format = None
         self._font_config = None
         self._vertical_position = 50
+        self._dispose_generator()
 
         if self._preview_image:
             self._preview_image.src = ""

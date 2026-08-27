@@ -5,11 +5,29 @@
 
 import uuid as uuid_mod
 from pathlib import Path
-from unittest.mock import patch
 
+import pytest
+from PIL import ImageFont
 from hypothesis import HealthCheck, given, settings, strategies as st
 
 from utils.font_manager import FontManager
+
+
+@pytest.fixture(autouse=True)
+def _reset_pillow_font_state():
+    """Guard against cross-test pollution of Pillow's font loader.
+
+    Some suites patch ``PIL.ImageFont.truetype`` (used by
+    ``FontManager.validate_ttf``). If such a patch leaked, the "valid TTF is
+    accepted" property here could pass or fail for the wrong reason. Capturing
+    and restoring the original callable makes every test in this module
+    self-contained regardless of run order.
+    """
+    original_truetype = ImageFont.truetype
+    try:
+        yield
+    finally:
+        ImageFont.truetype = original_truetype
 
 
 def _make_minimal_ttf() -> bytes:
