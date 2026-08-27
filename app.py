@@ -1,6 +1,7 @@
 """CertFlow — Automated Certificate Generator and Email Sender."""
 
 import base64
+import inspect
 import io
 import re
 import zipfile
@@ -273,10 +274,14 @@ st.markdown("""
             width: auto !important;
             margin: 0 auto !important;
         }
-        /* Header logo shrinks on mobile */
+        /* Header logo scales down on mobile */
         .block-container img[alt="AWSSBG Global City logo"] {
-            height: 72px !important;
+            height: 150px !important;
             width: auto !important;
+        }
+        /* Smaller brand title on narrow screens */
+        .block-container img[alt="AWSSBG Global City logo"] + div h1 {
+            font-size: 2.4rem !important;
         }
     }
 
@@ -473,7 +478,15 @@ def _render_sidebar() -> None:
         # Sidebar header — logo centered + compact brand text
         _logo_path = Path("image/NEW_AWSLC_LOGO-removebg-preview.png")
         if _logo_path.exists():
-            st.image(str(_logo_path), use_container_width=True)
+            _sb_logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
+            st.markdown(
+                f'<div style="display:flex;justify-content:center;'
+                f'margin:0 0 8px 0;">'
+                f'<img src="data:image/png;base64,{_sb_logo_b64}" '
+                f'style="height:170px;width:auto;object-fit:contain;" '
+                f'alt="AWSSBG Global City sidebar logo"></div>',
+                unsafe_allow_html=True,
+            )
         st.markdown(
             '<p style="text-align:center;font-weight:700;font-size:1.3rem;margin:0;">CertFlow</p>'
             '<p style="text-align:center;font-size:0.75rem;color:#64748b;margin:0;">AWSSBG Global City</p>',
@@ -583,13 +596,18 @@ logo_path = Path("image/NEW_AWSLC_LOGO-removebg-preview.png")
 if logo_path.exists():
     logo_b64 = base64.b64encode(logo_path.read_bytes()).decode()
     st.markdown(
-        f'<div style="display:flex;align-items:center;gap:20px;margin-bottom:8px;">'
+        f'<div style="display:flex;align-items:center;gap:44px;margin-bottom:8px;">'
         f'<img src="data:image/png;base64,{logo_b64}" '
-        f'style="height:120px;width:auto;object-fit:contain;flex-shrink:0;" '
+        f'style="height:340px;width:auto;object-fit:contain;flex-shrink:0;" '
         f'alt="AWSSBG Global City logo">'
-        f'<div>'
-        f'<h1 style="margin:0;font-size:2.6rem;line-height:1.1;">CertFlow</h1>'
-        f'<p style="margin:0;color:#64748b;font-size:1rem;">Automated Certificate Generator</p>'
+        f'<div style="display:flex;flex-direction:column;justify-content:center;">'
+        f'<span style="font-size:1.05rem;font-weight:600;letter-spacing:0.16em;'
+        f'text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">'
+        f'AWSSBG Global City</span>'
+        f'<h1 style="margin:0;font-size:4.4rem;line-height:1;font-weight:800;">'
+        f'CertFlow</h1>'
+        f'<p style="margin:10px 0 0 0;color:#64748b;font-size:1.2rem;">'
+        f'Automated Certificate Generator</p>'
         f'</div>'
         f'</div>',
         unsafe_allow_html=True,
@@ -1143,7 +1161,21 @@ else:
             except Exception:
                 return None
 
-        @st.dialog("Certificate Fullscreen", width="large")
+        def _dismiss_zoom_dialog():
+            """Clear the zoom flag when the dialog is dismissed (X / ESC / click-away).
+
+            Without this, ``zoom_cert_idx`` persists in session_state and the
+            dialog re-opens itself on the next rerun.
+            """
+            st.session_state.pop("zoom_cert_idx", None)
+
+        # ``on_dismiss`` was added to st.dialog in newer Streamlit releases.
+        # Pass it only when supported so we stay compatible with 1.38+.
+        _dialog_kwargs = {"width": "large"}
+        if "on_dismiss" in inspect.signature(st.dialog).parameters:
+            _dialog_kwargs["on_dismiss"] = _dismiss_zoom_dialog
+
+        @st.dialog("Certificate Fullscreen", **_dialog_kwargs)
         def _show_zoom_dialog():
             cert_idx = st.session_state.get("zoom_cert_idx", 0)
             generated_certs = st.session_state["generated_certs"]
@@ -1233,7 +1265,7 @@ else:
                     icon=":material/grid_view:",
                     use_container_width=True,
                 ):
-                    del st.session_state["zoom_cert_idx"]
+                    st.session_state.pop("zoom_cert_idx", None)
                     st.rerun()
             with nav_col3:
                 if cert_idx < total_certs - 1:
